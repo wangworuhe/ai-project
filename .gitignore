@@ -45,8 +45,8 @@ azure-venv/
 # 音频内容
 outputs/*
 uploads/*
-!uploads/.gitkeep
-!outputs/.gitkeep
+# !uploads/.gitkeep
+# !outputs/.gitkeep
 
 # Django 特有
 staticfiles/
