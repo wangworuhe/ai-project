@@ -1,0 +1,36 @@
+textarea {
+    width: 100%;
+    min-height: 50px;
+    font-size: 16px;
+    font-family: Arial, sans-serif;
+    padding: 8px;
+    border: 1px solid #ccc;
+    border-radius: 5px;
+    resize: none;
+  }
+  
+  /* 优化按钮布局 */
+  .button-group {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+  
+  /* 波形图样式 */
+  .waveform {
+    width: 100%;
+    height: 50px;
+    background: #f1f1f1;
+    border-radius: 5px;
+    margin-top: 10px;
+  }
+  
+  .evaluate-button {
+    margin-top: 10px;
+  }
+  
+  .error {
+    color: red;
+    font-weight: bold;
+  }
+  
