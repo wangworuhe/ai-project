@@ -1,0 +1,77 @@
+# === 通用设置 ===
+*.log
+*.tmp
+*.bak
+*.swp
+*.swo
+*.orig
+.DS_Store
+Thumbs.db
+logs/
+
+# === 操作系统 ===
+ehthumbs.db
+Icon?
+Desktop.ini
+
+# === 编辑器 ===
+.vscode/
+.idea/
+
+# === Python 后端 ===
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+*.sqlite3
+*.db
+.env
+.env.*
+.mypy_cache/
+.pytest_cache/
+.tox/
+.coverage
+htmlcov/
+build/
+dist/
+
+# Pip / Poetry / Venv
+venv/
+.venv/
+pip-wheel-metadata/
+site/
+azure-venv/
+
+# Django 特有
+staticfiles/
+media/
+*.pot
+
+# FastAPI / Flask
+instance/
+*.sqlite
+
+# === Node.js 前端 ===
+frontend/node_modules/
+frontend/dist/
+frontend/build/
+frontend/.env
+frontend/.env.*
+frontend/.output/
+frontend/.cache/
+frontend/.DS_Store
+frontend/.vscode/
+frontend/**/*.log
+
+# === 输出产物统一忽略 ===
+dist/
+build/
+coverage/
+output/
+
+# === 不要忽略这些（白名单）===
+!frontend/package.json
+!frontend/package-lock.json
+!frontend/yarn.lock
+!frontend/pnpm-lock.yaml
+!requirements.txt
