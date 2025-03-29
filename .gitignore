@@ -42,6 +42,12 @@ pip-wheel-metadata/
 site/
 azure-venv/
 
+# 音频内容
+outputs/*
+uploads/*
+!uploads/.gitkeep
+!outputs/.gitkeep
+
 # Django 特有
 staticfiles/
 media/
