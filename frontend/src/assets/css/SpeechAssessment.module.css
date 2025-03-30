@@ -1,0 +1,63 @@
+
+.assessment-container {
+  position: relative;
+  display: flex;
+  width: 100%;
+  padding: 60px 20px 20px;
+  box-sizing: border-box;
+}
+
+.global-title {
+  position: absolute;
+  top: 5px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 24px;
+  font-weight: 600;
+}
+
+.input-box {
+  width: 85%;
+  min-height: 120px;
+  margin: 0 20px;
+  padding: 16px 24px;
+  border-radius: 8px;
+  box-shadow: 0 1px 6px rgba(32,33,36,.28);
+  border: 1px solid #dfe1e5;
+  font-size: 22px;
+  font-family: 'Segoe UI', 'Google Sans', Arial, sans-serif;
+  resize: none;
+  overflow-y: auto;
+}
+.input-box:focus {
+  border-color: #4285f4;
+  box-shadow: 0 1px 6px rgba(66,133,244,.28);
+}
+
+.button-group {
+  margin: 16px 20px;
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.recording-button {
+  background-color: #ff4d4d;
+  color: white;
+}
+.play-button {
+  background-color: #007bff;
+}
+.evaluate-button {
+  background-color: #4CAF50;
+}
+
+.word-popup {
+  position: absolute;
+  background: white;
+  border: 2px solid #007bff;
+  border-radius: 5px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+  padding: 10px;
+  z-index: 1000;
+}

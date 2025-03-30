@@ -1,35 +1,32 @@
 <template>
+  <!-- ✅ 按钮绑定：使用 controlButtons 配置渲染按钮 -->
   <div class="assessment-container">
     <div class="global-title">语音评估</div>
 
     <div class="left-panel">
-      <!-- 输入区域 -->
       <div class="input-section">
-        <textarea 
-          v-model="text" 
+        <!-- 输入文本框 -->
+        <textarea
+          v-model="text"
           @input="autoResize"
-          :style="textAreaStyle" 
+          :style="textAreaStyle"
           class="input-box"
-          placeholder="输入文本进行评估..."
+          placeholder="请输入评估文本"
         ></textarea>
 
-        <!-- 操作按钮组 -->
+        <!-- 控制按钮组 -->
         <div class="button-group">
-          <button 
-            v-for="(btn, idx) in controlButtons" 
+          <button
+            v-for="(btn, idx) in controlButtons"
             :key="idx"
+            :class="[btn.class, { active: btn.activeCondition?.() }]"
             @click="btn.action"
-            :disabled="btn.disabled?.(this)"
-            :class="[
-              btn.class, 
-              { active: btn.activeCondition?.(this) }
-            ]"
+            :disabled="btn.disabled?.()"
           >
-            {{ btn.text(this) }}
+            {{ btn.text() }}
           </button>
         </div>
-        <!-- 显示错误信息 -->
-        <br />
+        <!-- 错误提示信息 -->
         <p v-if="errorMessage" class="error-message">{{ errorMessage }}</p>
       </div>
     </div>
@@ -43,7 +40,9 @@
             <template v-for="(word, index) in processedWords" :key="index">
               <span
                 @click="handleWordClick(word, index, $event)"
-                :class="[shouldHighlight(word.errorType), { 'clickable-word': word.Phonemes?.length }]"
+                :class="[word.errorType, { 'clickable-word': word.Phonemes?.length }]"
+                @mouseenter="showPhonemesTooltip(word, $event)"
+                @mouseleave="hideTooltip"
               >
                 {{ word.Word }}
               </span>
@@ -142,394 +141,377 @@
         </div>
       </div>
     </div>
+
+  </div>
+
+  <!-- Cambridge 字典组件 -->
+   <!-- 美式音标与发音区域 -->
+  <div class="cambridge-section">
+    <button @click="showCambridge = !showCambridge" class="query-button">
+      {{ showCambridge ? '隐藏发音查询' : '查询音标与发音' }}
+    </button>
+    <CambridgeLookup v-if="showCambridge" :word="currentWordDetails.word" />
   </div>
 </template>
-<transition name="tooltip">
-  <div 
-    v-if="showTooltip"
-    class="phoneme-tooltip"
-    :style="{
-      left: `${tooltipPosition.x}px`,
-      top: `${tooltipPosition.y}px`
-    }"
-  >
-    <div class="tooltip-header">音素得分</div>
-    <div v-html="tooltipContent"></div>
-  </div>
-</transition>
 
-<script>
-import axios from "axios";
-
-export default {
-  computed: {
-    textAreaStyle() {
-      const baseSize = this.text.length > 40 ? 22 : 
-                      this.text.length > 30 ? 26 : 28;
-      return {
-        fontSize: `${baseSize}px`,
-        lineHeight: `${baseSize * 1.3}px`
-      };
-    },
-    // 过滤器标签
-    processedWords() {
-      return (this.words || []).filter(word => {
-      // 特别处理 insertion 类型
-        if (word.errorType === 'insertion' && !this.errorFilters.insertion) return false;
-        return true;
-      });
-    },
-    // 弹窗位置
-    popupStyle() {
-      return {
-        left: `${this.popupPosition.x}px`,
-        top: `${this.popupPosition.y}px`,
-        minWidth: `${this.popupWidth}px`,
-        minHeight: `${this.popupHeight}px`,
-        maxWidth: "650px" // 限制最大宽度，防止超出
-      };
-    }
-  },
-  data() {
-    return {
-      text: "",
-      score: null, // 评估结果
-      pron_score: null, // 发音评分
-      accuracy: null, // 准确度
-      fluency: null, // 流利度
-      completeness: null, // 完整度
-      prosody_score: null, // 韵律评分
-      words: null, // 单词级评估
-      errorMessage: "", // 错误信息
-      isEvaluating: false, // 评估状态-禁用按钮
-      isPlaying: false, // 录音播放状态
-      recording: false, // 录音状态-禁用按钮
-      mediaRecorder: null, // 录音对象
-      audioChunks: [], // 存储音频数据
-      audioBlob: null, // 存储音频 Blob
-      audioUrl: null, // 存储录音播放 URL
-      detailedResult: null, // 详细评估信息
-      textareaHeight: 50, // 输入框初始高度
-      errorFilters: {
-        mispronunciation: true,
-        omission: true,
-        insertion: true,
-        unexpectedBreak: true,
-        missingBreak: true,
-        monotone: true
-      },
-      expandedIndex: -1, // 展开的单词索引
-      showTooltip: false,        // 控制显示/隐藏
-      tooltipContent: '',        // 存储提示内容
-      tooltipPosition: { x: 0, y: 0 }, // 存储提示位置
-      controlButtons: [ // 按钮配置化
-        {
-          class: 'recording-button',
-          action: this.toggleRecording,
-          activeCondition: vm => vm.recording,
-          text: vm => vm.recording ? "⏹ 停止录音 (R)" : "🎤 开始录音 (R)"
-        },
-        {
-          class: 'play-button',
-          action: this.playRecording,
-          disabled: vm => !vm.audioBlob,
-          text: vm => vm.isPlaying ? "🔊 播放中..." : "▶ 播放录音"
-        },
-        {
-          class: 'evaluate-button',
-          action: this.assessSpeech,
-          disabled: vm => vm.isEvaluating || vm.recording, // 新增录音状态检查
-          text: vm => vm.isEvaluating ? "正在评估..." : "开始语音评估"
-        }
-      ],
-      showPopup: false, // 控制弹窗显示
-      currentWordDetails: null, // 弹窗数据
-      popupPosition: { x: 0, y: 0 }, // 存储弹窗位置
-      popupWidth: 400, // 默认宽度
-      popupHeight: 160 // 默认高度
-    };
-  },
-
-  mounted() {
-    document.addEventListener("keydown", this.handleKeydown);
-    document.addEventListener("click", this.handleClickOutside);
-  },
-
-  beforeUnmount() {
-    document.removeEventListener("click", this.handleClickOutside);
-  },
-
-  methods: {
-    // 单词点击事件
-    handleWordClick(word, index, event) {
-      event.stopPropagation(); // 阻止冒泡，避免触发 handleClickOutside
-      if (!word.Phonemes?.length) return; // 没有音素数据则不显示弹窗
-
-      const rect = event.target.getBoundingClientRect(); // 获取单词位置
-
-      // 设置弹窗数据
-      this.currentWordDetails = {
-            pronunciationScore: word.PronunciationAssessment?.AccuracyScore,
-            phonemes: word.Phonemes?.map(p => ({
-              phoneme: p.Phoneme,
-              score: p.PronunciationAssessment?.AccuracyScore ?? 'N/A'
-            })) || [],
-            syllables: word.Syllables?.map(s => ({
-              syllable: s.Syllable,
-              score: s.PronunciationAssessment?.AccuracyScore ?? 'N/A'
-            })) || []
-          }
-
-      const popupWidth = this.popupWidth; // 获取默认弹窗宽度
-      this.popupPosition = {
-        x: rect.left + window.scrollX + rect.width / 2 - popupWidth / 2, // 水平方向居中
-        y: rect.bottom + window.scrollY + 5 // 让弹窗在单词下方
-      };
-      this.showPopup = true;
-    },
-
-    handleClickOutside(event) {
-      // 检查点击的元素是否是弹窗内部的元素
-      if (this.$refs.popupEl && !this.$refs.popupEl.contains(event.target)) {
-        this.showPopup = false;
-      }
-    },
-
-    // 仿谷歌输入框自动调整高度
-    autoResize() {
-      this.$nextTick(() => {
-        const textarea = this.$el.querySelector('.input-box');
-        textarea.style.height = 'auto'; // 重置高度
-        const newHeight = Math.min(textarea.scrollHeight + 5, 580); // 最大高度300px
-        textarea.style.height = newHeight + 'px';
-        this.textareaHeight = newHeight;
-      });
-    },
-
-    // 添加过滤器标签翻译方法
-    getFilterLabel(key) {
-      const labels = {
-        mispronunciation: '发音错误',
-        omission: '单词缺失',
-        insertion: '多余单词',
-        unexpectedBreak: '意外停顿',
-        missingBreak: '缺少停顿',
-        monotone: '单调语音'
-      };
-      return labels[key] || key;
-    },
-
-    // 新增的errorType核心方法
-    shouldHighlight(errorType) {
-      return this.errorFilters[errorType] ? errorType : '';
-    },
-
-    // 新增展开/收起逻辑
-    toggleExpand(index) {
-      this.expandedIndex = this.expandedIndex === index ? -1 : index;
-    },
-
-    showPhonemesTooltip(word, event) {
-      if (!word.Phonemes) return;
-      
-      // 1. 计算位置
-      const rect = event.target.getBoundingClientRect();
-      this.tooltipPosition = {
-        x: rect.left + window.scrollX,  // 兼容页面滚动
-        y: rect.top + window.scrollY - 40
-      };
-      
-      // 2. 生成内容
-      this.tooltipContent = word.Phonemes.map(p => `
-        <div class="phoneme-row">
-          <span>${p.Phoneme}</span>
-          <span style="color: ${this.getPhonemeColor(p)}">
-            ${p.PronunciationAssessment?.AccuracyScore ?? 'N/A'}
-          </span>
-        </div>
-      `).join('');
-      
-      // 3. 显示提示
-      this.showTooltip = true;
-    },
-    
-    hideTooltip() {
-      this.showTooltip = false;
-      this.tooltipContent = '';
-    },
-
-    updateTooltipPosition(event) {
-      if (!this.showTooltip) return;
-      const rect = event.target.getBoundingClientRect();
-      this.tooltipPosition = {
-        x: rect.left + window.scrollX,
-        y: rect.top + window.scrollY - 40
-      };
-    },
-
-    getPhonemeColor(phoneme) {
-      const score = phoneme.PronunciationAssessment?.AccuracyScore;
-      if (score < 60) return '#dc2626';
-      if (score < 80) return '#f4f4f5';
-      return '#676769';
-    },
-
-    // 评分颜色
-    getScoreClass(score) {
-      const numericScore = Number(score);
-      if (isNaN(numericScore)) return '';
-      if (numericScore < 60) return 'score-low';
-      if (numericScore <= 80) return 'score-mid';
-      return 'score-high';
-    },
-
-    handleKeydown(event) {
-      // 如果事件源是输入框或 textarea，则不触发快捷键逻辑
-      const tagName = event.target.tagName.toLowerCase();
-      if (tagName === "input" || tagName === "textarea") {
-        return;
-      }
-      
-      if (event.key === "r" && event.ctrlKey) {
-        event.preventDefault(); // 阻止 Ctrl+R 导致浏览器刷新
-        this.playRecording();
-      } else if (event.key === "r" && !event.ctrlKey) {
-        event.preventDefault();
-        this.toggleRecording();
-      }
-    },
-
-    // 录音相关功能
-    async toggleRecording() {
-      if (this.recording) {
-        this.stopRecording();
-      } else {
-        await this.startRecording();
-      }
-    },
-
-    async startRecording() {
-      this.audioChunks = []; // 清空之前的录音
-      this.audioBlob = null;
-      this.audioUrl = null;
-
-      try {
-        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        this.mediaRecorder = new MediaRecorder(stream);
-
-        this.mediaRecorder.ondataavailable = (event) => {
-          this.audioChunks.push(event.data);
-        };
-
-        this.mediaRecorder.onstop = () => {
-          this.audioBlob = new Blob(this.audioChunks, { type: "audio/webm" });
-          this.audioUrl = URL.createObjectURL(this.audioBlob);
-        };
-
-        this.mediaRecorder.start();
-        this.recording = true;
-      } catch (error) {
-        console.error("无法访问麦克风:", error);
-        alert("无法访问麦克风，请检查权限设置。");
-      }
-    },
-
-    stopRecording() {
-      if (this.mediaRecorder && this.recording) {
-        this.mediaRecorder.stop();
-        this.recording = false;
-
-        // 确保 Blob 以 WAV 格式存储
-        this.audioBlob = new Blob(this.audioChunks, { type: "audio/webm" });
-        this.audioUrl = URL.createObjectURL(this.audioBlob);
-      }
-    },
-
-    // 播放录音
-    playRecording() {
-      if (!this.audioUrl) {
-        alert("没有可播放的录音");
-        return;
-      }
-
-      if (this.isPlaying) return; // 防止重复播放
-
-      this.isPlaying = true; // 播放开始，修改按钮状态
-      const audio = new Audio(this.audioUrl);
-
-      audio.onended = () => {
-        this.isPlaying = false; // 播放结束，恢复按钮状态
-      };
-
-      audio.play();
-    },
-
-    // 语音评估
-    async assessSpeech() {
-      if (!this.text.trim()) {
-        this.errorMessage = "请输入文本进行评估";
-        return;
-      }
-      if (!this.audioBlob) {
-        this.errorMessage = "请先录制语音文件";
-        return;
-      }
-
-      this.isEvaluating = true; // 开始评估，禁用按钮
-      this.errorMessage = ""; // 清除之前的错误信息
-
-      const formData = new FormData();
-      formData.append("audio", this.audioBlob, "recording.wav"); // 确保文件名为 .wav
-      formData.append("reference_text", this.text);
-
-      try {
-        const res = await axios.post("http://127.0.0.1:5000/assessment/upload", formData, {
-          headers: { "Content-Type": "multipart/form-data" }
-        });
-
-        // 打印 detailedResult 数据结构
-        console.log("detailedResult:", res.data.data.detailed_result);
-
-        this.score = res.data.data.pronunciation_score; // 评估结果
-        this.pron_score = res.data.data.pronunciation_score; // 发音评分
-        this.accuracy = res.data.data.accuracy_score; // 准确度
-        this.fluency = res.data.data.fluency_score; // 流利度
-        this.completeness = res.data.data.completeness_score; // 完整度
-        this.prosody_score = res.data.data.prosody_score; // 韵律评分
-        this.detailedResult = res.data.data.detailed_result; // 详细评估信息
-        const nBestData = this.detailedResult?.NBest?.[0] || {};
-        // 处理单词数据
-        this.words = nBestData.Words?.map(word => ({
-           ...word,
-           errorType: word.PronunciationAssessment?.ErrorType?.toLowerCase() || 'none'
-         })) ?? [];
-
-        // this.content_assessment_result = res.data.data.content_assessment_result; // 内容评估结果
-        this.errorMessage = ""; // 清除错误信息
-      } catch (error) {
-        console.error("评估请求失败:", error);
-        console.log("完整错误信息：", error);
-        console.log("服务器返回数据：", error.response?.data);
-
-        if (error.response && error.response.data) {
-          this.errorMessage = error.response.data.message || "服务器返回未知错误";
-        } else if (error.message) {
-          this.errorMessage = error.message;
-        } else {
-          this.errorMessage = "无法连接语音评估服务器，请检查后端是否运行。";
-        }
-
-      } finally {
-        this.isEvaluating = false; // 评估完成，恢复按钮
-      }
-    },
+    <!-- 工具提示 tooltip -->
+    <transition name="tooltip">
+      <div
+        v-if="showTooltip"
+        class="phoneme-tooltip"
+        :style="{ left: `${tooltipPosition.x}px`, top: `${tooltipPosition.y}px` }"
+      >
+        <div class="tooltip-header">音素得分</div>
+        <div v-html="tooltipContent"></div>
+      </div>
+    </transition>
 
 
+<script setup>
+// 导入依赖
+import { ref, reactive, computed, onMounted, onBeforeUnmount, nextTick } from 'vue'
+import axios from 'axios'
+import CambridgeLookup from './CambridgeLookup.vue'
+
+// 字典组件
+const showCambridge = ref(false)
+
+// 评估输入与结果状态
+const text = ref('')                     // 用户输入的文本
+const score = ref(null)                  // 综合得分
+const pron_score = ref(null)             // 发音评分
+const accuracy = ref(null)               // 准确度
+const fluency = ref(null)                // 流利度
+const completeness = ref(null)           // 完整度
+const prosody_score = ref(null)          // 韵律评分
+
+// 单词和详细评估结果
+const words = ref([])                    // 每个单词的评估结果
+const detailedResult = ref(null)         // 完整评估返回数据
+
+// 音频录音相关
+const isEvaluating = ref(false)          // 是否正在评估中
+const isPlaying = ref(false)             // 是否正在播放录音
+const recording = ref(false)             // 是否正在录音
+const mediaRecorder = ref(null)          // MediaRecorder 对象
+const audioChunks = ref([])              // 录音块数据
+const audioBlob = ref(null)              // 最终音频 Blob
+const audioUrl = ref(null)               // 可播放 URL
+
+// 输入框和错误信息
+const errorMessage = ref('')             // 错误提示信息
+const textareaHeight = ref(50)           // 输入框高度
+
+// 错误筛选器（使用 reactive 对象）
+const errorFilters = reactive({
+  mispronunciation: true,
+  omission: true,
+  insertion: true,
+  unexpectedBreak: true,
+  missingBreak: true,
+  monotone: true
+})
+
+// 弹窗交互相关
+// const expandedIndex = ref(-1)            // 当前展开的单词索引
+const showPopup = ref(false)             // 是否显示单词弹窗
+const currentWordDetails = ref(null)     // 当前弹窗展示的单词详情
+const popupPosition = reactive({ x: 0, y: 0 })
+const popupWidth = ref(400)
+const popupHeight = ref(160)
+const popupEl = ref(null)                // 弹窗 DOM 引用
+
+// Tooltip 提示状态
+const showTooltip = ref(false)
+const tooltipContent = ref('')
+const tooltipPosition = reactive({ x: 0, y: 0 })
+
+// ✅ 第 3 步：迁移 computed 计算属性
+
+// 输入框样式根据文本长度动态调整字号
+const textAreaStyle = computed(() => {
+  const baseSize = text.value.length > 40 ? 22 : 
+                   text.value.length > 30 ? 26 : 28
+  return {
+    fontSize: `${baseSize}px`,
+    lineHeight: `${baseSize * 1.3}px`
   }
-};
+})
+
+// 过滤后的单词（用于错误筛选）
+const processedWords = computed(() => {
+  return (words.value || []).filter(word => {
+    if (word.errorType === 'insertion' && !errorFilters.insertion) return false
+    return true
+  })
+})
+
+// 弹窗位置样式（绑定 style）
+const popupStyle = computed(() => {
+  return {
+    left: `${popupPosition.x}px`,
+    top: `${popupPosition.y}px`,
+    minWidth: `${popupWidth.value}px`,
+    minHeight: `${popupHeight.value}px`,
+    maxWidth: '650px'
+  }
+})
+
+// 获取错误类型中文名称
+const getFilterLabel = (key) => {
+  const labels = {
+    mispronunciation: '发音错误',
+    omission: '单词缺失',
+    insertion: '多余单词',
+    unexpectedBreak: '意外停顿',
+    missingBreak: '缺少停顿',
+    monotone: '单调语音'
+  }
+  return labels[key] || key
+}
+
+// 根据评分数值返回样式类名
+const getScoreClass = (score) => {
+  const numeric = Number(score)
+  if (isNaN(numeric)) return ''
+  if (numeric < 60) return 'score-low'
+  if (numeric <= 80) return 'score-mid'
+  return 'score-high'
+}
+
+// ✅ 第 4 步：迁移 methods 到函数写法（含注释）
+
+// 自动调整 textarea 高度
+const autoResize = () => {
+  nextTick(() => {
+    const textarea = document.querySelector('.input-box')
+    if (!textarea) return
+    textarea.style.height = 'auto'
+    const newHeight = Math.min(textarea.scrollHeight + 5, 580)
+    textarea.style.height = `${newHeight}px`
+    textareaHeight.value = newHeight
+  })
+}
+
+// 切换录音状态
+const toggleRecording = async () => {
+  if (recording.value) {
+    stopRecording()
+  } else {
+    await startRecording()
+  }
+}
+
+// 开始录音
+const startRecording = async () => {
+  audioChunks.value = []
+  audioBlob.value = null
+  audioUrl.value = null
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+    mediaRecorder.value = new MediaRecorder(stream)
+    mediaRecorder.value.ondataavailable = event => {
+      audioChunks.value.push(event.data)
+    }
+    mediaRecorder.value.onstop = () => {
+      audioBlob.value = new Blob(audioChunks.value, { type: 'audio/webm' })
+      audioUrl.value = URL.createObjectURL(audioBlob.value)
+    }
+    mediaRecorder.value.start()
+    recording.value = true
+  } catch (err) {
+    console.error('麦克风错误', err)
+    alert('无法访问麦克风，请检查权限设置。')
+  }
+}
+
+// 停止录音
+const stopRecording = () => {
+  if (mediaRecorder.value && recording.value) {
+    mediaRecorder.value.stop()
+    recording.value = false
+    audioBlob.value = new Blob(audioChunks.value, { type: 'audio/webm' })
+    audioUrl.value = URL.createObjectURL(audioBlob.value)
+  }
+}
+
+// 播放录音
+const playRecording = () => {
+  if (!audioUrl.value) return alert('没有可播放的录音')
+  if (isPlaying.value) return
+  isPlaying.value = true
+  const audio = new Audio(audioUrl.value)
+  audio.onended = () => isPlaying.value = false
+  audio.play()
+}
+
+// 快捷键监听
+const handleKeydown = (e) => {
+  const tag = e.target.tagName.toLowerCase()
+  if (tag === 'input' || tag === 'textarea') return
+  if (e.key === 'r' && e.ctrlKey) {
+    e.preventDefault()
+    playRecording()
+  } else if (e.key === 'r') {
+    e.preventDefault()
+    toggleRecording()
+  }
+}
+
+// 点击弹窗外部时隐藏弹窗
+const handleClickOutside = (event) => {
+  if (popupEl.value && !popupEl.value.contains(event.target)) {
+    showPopup.value = false
+  }
+}
+
+// ✅ 第 7 步：功能迁移 - 语音评估主函数 assessSpeech()
+
+// 发起语音评估请求
+const assessSpeech = async () => {
+  if (!text.value.trim()) {
+    errorMessage.value = '请输入文本进行评估'
+    return
+  }
+  if (!audioBlob.value) {
+    errorMessage.value = '请先录制语音文件'
+    return
+  }
+  isEvaluating.value = true
+  errorMessage.value = ''
+
+  const formData = new FormData()
+  formData.append('audio', audioBlob.value, 'recording.wav')
+  formData.append('reference_text', text.value)
+
+  try {
+    const res = await axios.post('http://127.0.0.1:5000/assessment/upload', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' }
+    })
+    const data = res.data.data
+    score.value = data.pronunciation_score
+    pron_score.value = data.pronunciation_score
+    accuracy.value = data.accuracy_score
+    fluency.value = data.fluency_score
+    completeness.value = data.completeness_score
+    prosody_score.value = data.prosody_score
+    detailedResult.value = data.detailed_result
+    const nBest = data.detailed_result?.NBest?.[0] || {}
+    words.value = (nBest.Words || []).map(w => ({
+      ...w,
+      errorType: w.PronunciationAssessment?.ErrorType?.toLowerCase() || 'none'
+    }))
+  } catch (err) {
+    console.error('评估失败', err)
+    errorMessage.value = err.response?.data?.message || err.message || '连接失败'
+  } finally {
+    isEvaluating.value = false
+  }
+}
+
+// 单词点击展示评分弹窗
+const handleWordClick = (word, index, event) => {
+  event.stopPropagation()
+  if (!word.Phonemes?.length) return
+
+  const rect = event.target.getBoundingClientRect()
+  popupPosition.x = rect.left + window.scrollX + rect.width / 2 - popupWidth.value / 2
+  popupPosition.y = rect.bottom + window.scrollY + 5
+
+  currentWordDetails.value = {
+    pronunciationScore: word.PronunciationAssessment?.AccuracyScore,
+    phonemes: word.Phonemes?.map(p => ({
+      phoneme: p.Phoneme,
+      score: p.PronunciationAssessment?.AccuracyScore ?? 'N/A'
+    })) || [],
+    syllables: word.Syllables?.map(s => ({
+      syllable: s.Syllable,
+      score: s.PronunciationAssessment?.AccuracyScore ?? 'N/A'
+    })) || []
+  }
+  showPopup.value = true
+}
+
+// ✅ 第 9 步：功能迁移 - 工具提示 Tooltip 相关函数
+
+// 显示音素提示气泡
+const showPhonemesTooltip = (word, event) => {
+  if (!word.Phonemes) return
+  const rect = event.target.getBoundingClientRect()
+  tooltipPosition.x = rect.left + window.scrollX
+  tooltipPosition.y = rect.top + window.scrollY - 40
+
+  tooltipContent.value = word.Phonemes.map(p => `
+    <div class="phoneme-row">
+      <span>${p.Phoneme}</span>
+      <span style="color: ${getPhonemeColor(p)}">
+        ${p.PronunciationAssessment?.AccuracyScore ?? 'N/A'}
+      </span>
+    </div>
+  `).join('')
+
+  showTooltip.value = true
+}
+
+// 隐藏提示
+const hideTooltip = () => {
+  showTooltip.value = false
+  tooltipContent.value = ''
+}
+
+// 实时更新 tooltip 位置（可选）
+// const updateTooltipPosition = (event) => {
+//   if (!showTooltip.value) return
+//   const rect = event.target.getBoundingClientRect()
+//   tooltipPosition.x = rect.left + window.scrollX
+//   tooltipPosition.y = rect.top + window.scrollY - 40
+// }
+
+// 根据音素得分返回颜色
+const getPhonemeColor = (phoneme) => {
+  const score = phoneme.PronunciationAssessment?.AccuracyScore
+  if (score < 60) return '#dc2626'
+  if (score < 80) return '#f4f4f5'
+  return '#676769'
+}
+
+// ✅ 第 10 步：按钮控制组配置
+
+const controlButtons = [
+  {
+    class: 'recording-button',
+    action: toggleRecording,
+    activeCondition: () => recording.value,
+    text: () => recording.value ? '⏹ 停止录音 (R)' : '🎤 开始录音 (R)'
+  },
+  {
+    class: 'play-button',
+    action: playRecording,
+    disabled: () => !audioBlob.value,
+    text: () => isPlaying.value ? '🔊 播放中...' : '▶ 播放录音'
+  },
+  {
+    class: 'evaluate-button',
+    action: assessSpeech,
+    disabled: () => isEvaluating.value || recording.value,
+    text: () => isEvaluating.value ? '正在评估...' : '开始语音评估'
+  }
+]
+
+// ✅ 第 5 步：挂载生命周期事件
+
+onMounted(() => {
+  document.addEventListener('keydown', handleKeydown)
+  document.addEventListener('click', handleClickOutside)
+})
+
+onBeforeUnmount(() => {
+  document.removeEventListener('click', handleClickOutside)
+})
+
 </script>
 
-<style scoped>
+<style >
 .global-title {
   position: absolute;
   top: 5px;
@@ -967,5 +949,4 @@ export default {
 .score-high {
   color: #4f4f51;
 }
-
 </style>

@@ -1,3 +1,5 @@
+const path = require('path')
+
 module.exports = {
   transpileDependencies: true,
   devServer: {
@@ -8,5 +10,12 @@ module.exports = {
         pathRewrite: { '^/api': '' },
       },
     },
+  },
+  configureWebpack: {
+    resolve: {
+      alias: {
+        '@': path.resolve(__dirname, 'src')
+      }
+    }
   },
 }

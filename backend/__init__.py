@@ -7,6 +7,7 @@ from backend.routes.tts import tts_bp
 from backend.routes.stt import stt_bp
 from backend.routes.assessment import assessment_bp
 from backend.routes.translation import translation_bp
+from backend.routes.cambridge import cambridge_bp
 
 from flask_cors import CORS
 
@@ -32,5 +33,6 @@ def create_app():
     app.register_blueprint(stt_bp, url_prefix="/stt")
     app.register_blueprint(assessment_bp, url_prefix="/assessment")
     app.register_blueprint(translation_bp, url_prefix="/translation")
+    app.register_blueprint(cambridge_bp)
 
     return app

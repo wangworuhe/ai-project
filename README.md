@@ -29,5 +29,6 @@ flask --app run.py db init
 flask --app run.py db migrate -m "update migration."
 flask --app run.py db upgrade
 
-
 npm run serve
+
+git archive --format=zip HEAD -o ai-project.zip
