@@ -6,7 +6,7 @@
   font-size: 24px;
   font-weight: 600;
   z-index: 10;
-  padding: 1px 1px;
+  padding: 1px;
   border-radius: 8px;
 }
 
@@ -62,7 +62,7 @@
   flex-wrap: wrap;
 }
 
-.evaluate-btn {
+/* .evaluate-btn {
   margin-top: 10px;
   padding: 8px 16px;
   font-size: 16px;
@@ -71,7 +71,7 @@
   border: none;
   border-radius: 5px;
   cursor: pointer;
-}
+} */
 
 .evaluate-btn:hover {
   background-color: #0056b3;
@@ -169,8 +169,8 @@
 }
 
 .word-default {
-  background-color: transparent !important; /* 覆盖原有背景色 */
-  text-decoration: none !important; /* 移除删除线 */
+  background-color: transparent ; /* 覆盖原有背景色 */
+  text-decoration: none ; /* 移除删除线 */
   
   /* 其他需要重置的样式 */
   border: none;
@@ -253,7 +253,7 @@
 .insertion-count { background-color: #dc2626; }         /* 红色 */
 .unexpectedbreak-count { background-color: #ec4899; }   /* 粉色 #ec4899 */
 .missingbreak-count { background-color: #ec4899; } /* 浅灰 * #ec4899 color: #111;  */
-.monotone-count { background-color: #8b5cf6; }          /* 紫色 */
+.monotone-count { background-color: purple; }          /* 紫色 */
 
 /* 中间标签 + 图标 */
 .filter-label {
@@ -364,9 +364,9 @@
 }
 
 /* 音素颜色 */
-.phoneme-score-low { color: #dc2626; }
+/* .phoneme-score-low { color: #dc2626; }
 .phoneme-score-medium { color: #f4f4f5; }
-.phoneme-score-high { color: #676769; }
+.phoneme-score-high { color: #676769; } */
 
 /* 展开区域 */
 .phoneme-details {
@@ -390,7 +390,7 @@
 .word-token.insertion { background: red; }
 .word-token.unexpectedbreak { border-bottom: 2px solid #fecaca; }
 .word-token.missingbreak { border-bottom: 2px dashed #d1d5db; }
-.word-token.monotone { background: #310fc9; }
+.word-token.monotone { background: purple; }
 
 /* 空数据提示 */
 .no-data-tip {
@@ -401,7 +401,7 @@
 }
 
 /* 过渡动画 */
-.tooltip-enter-active {
+/* .tooltip-enter-active {
   transition: all 0.2s ease-out;
 }
 
@@ -413,7 +413,7 @@
 .tooltip-leave-to {
   opacity: 0;
   transform: translateY(-10px);
-}
+} */
 
 /* 可点击单词样式 */
 .clickable-word {
@@ -490,10 +490,10 @@
 }
 
 /* 预留区域样式 */
-.reserved-area {
+/* .reserved-area {
   border: 1px dashed #ddd;
   border-radius: 4px;
-}
+} */
 
 /* 评分颜色 */
 .score-low {
