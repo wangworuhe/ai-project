@@ -249,10 +249,10 @@
 
 /* 根据错误类型不同显示不同颜色 */
 .mispronunciation-count { background-color: #d49e00; } /* 黄色 */
-.omission-count { background-color: #4b5563; }          /* 深灰 */
-.insertion-count { background-color: #dc2626; }         /* 红色 */
+.omission-count { background-color: gray; }          /* 深灰 */
+.insertion-count { background-color: red; }         /* 红色 */
 .unexpectedbreak-count { background-color: #ec4899; }   /* 粉色 #ec4899 */
-.missingbreak-count { background-color: #ec4899; } /* 浅灰 * #ec4899 color: #111;  */
+.missingbreak-count { background-color: #ec4899; color: #111; } /* 浅灰 * #ec4899 color: #111;  */
 .monotone-count { background-color: purple; }          /* 紫色 */
 
 /* 中间标签 + 图标 */

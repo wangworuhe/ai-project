@@ -312,8 +312,8 @@ const errorFilters = reactive({
   mispronunciation: true,
   omission: true,
   insertion: true,
-  unexpectedBreak: true,
-  missingBreak: true,
+  unexpectedbreak: true,
+  missingbreak: true,
   monotone: true
 })
 
@@ -413,8 +413,8 @@ const getFilterLabel = (key) => {
     mispronunciation: '发音错误',
     omission: '单词缺失',
     insertion: '多余单词',
-    unexpectedBreak: '意外停顿',
-    missingBreak: '缺少停顿',
+    unexpectedbreak: '意外停顿',
+    missingbreak: '缺少停顿',
     monotone: '单调语音'
   }
   return labels[key] || key
