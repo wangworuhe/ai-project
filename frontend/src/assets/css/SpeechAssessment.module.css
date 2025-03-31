@@ -62,32 +62,26 @@
   flex-wrap: wrap;
 }
 
-/* .evaluate-btn {
-  margin-top: 10px;
-  padding: 8px 16px;
-  font-size: 16px;
-  color: white;
-  background-color: #007BFF;
-  border: none;
-  border-radius: 5px;
-  cursor: pointer;
-} */
-
 .evaluate-btn:hover {
   background-color: #0056b3;
 }
 
 .result-container {
+  background: #f8f9f8fa;
   display: flex;
   flex-direction: column;
-  height: calc(100vh - 100px); /*  根据实际高度调整 */
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+  /* min-height: min-content;  */
+  max-height: calc(100vh - 100px);
+  overflow-y: auto;
+  /* height: calc(100vh - 100px);  根据实际高度调整 */
 }
 
 .visualization-section {
   /* flex: 1; */
   display: flex;
   gap: 20px;
-  padding-bottom: 20px;
+  padding-bottom: 10px;
   border-bottom: 1px solid #eee;
 }
 
@@ -307,13 +301,14 @@
 }
 
 .summary-section {
-  padding-top: 1px;
+  padding-top: 10px;
   /* margin-top: 20px; */
 }
 
 .text-display {
   flex: 3;
   min-width: 0;
+  border: 1px solid #e2e8f0;
   background: #fff;
   border-radius: 8px;
   padding: 16px 24px;
@@ -534,15 +529,16 @@
 }
 
 .score-value {
-  font-size: 0.7em;
+  font-size: 0.6em;
   font-weight: 400;
   fill: #2d3748;
   font-family: 'Segoe UI', system-ui, sans-serif;
 }
 
 .score-label {
-  font-size: 0.5em;
-  fill: #718096;
+  font-size: 0.3em; 
+  fill: #2d3748;   
+  font-weight: 500;
   letter-spacing: 0.5px;
 }
 
@@ -562,15 +558,6 @@
   font-size: 0.6em;
   text-anchor: middle;
   fill: #2c3e50;
-}
-
-.ring-label {
-  position: absolute;
-  width: 100%;
-  text-align: center;
-  font-size: 20px;
-  margin-top: 8px;
-  font-weight: 500;
 }
 
 /* 右侧条形容器 */
@@ -641,5 +628,32 @@
   border-radius: 8px;
   padding: 20px;
   box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-  min-height: 220px;
+  /* min-height: 220px; */
+}
+
+.cambridge-dictionary {
+  /* background-color: #fff;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  padding: 16px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  transition: box-shadow 0.3s ease; */
+  margin-left: 40px; 
+  max-width: 500px;
+}
+
+
+
+.google-translate-api {
+  background-color: #fff;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  padding: 16px;
+  margin: 16px 0;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  transition: box-shadow 0.3s ease;
+}
+
+.google-translate-api:hover {
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
 }

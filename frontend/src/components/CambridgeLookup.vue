@@ -1,6 +1,7 @@
 <template>
     <div class="cambridge-card">
-      <h3>🔍 查询单词音标（Cambridge）</h3>
+      <!-- <div class="cambridge-title">单词音标查询</div> -->
+      <h3 class="cambridge-title">单词音标查询</h3>
       <input
         v-model="word"
         @keydown.enter="fetchPronunciation"
@@ -9,23 +10,33 @@
       />
       <button @click="fetchPronunciation" class="btn">查询</button>
   
-      <div v-if="loading" class="info">加载中...</div>
+      <!-- <div v-if="loading" class="info">加载中...</div> -->
   
       <div v-if="error" class="error">❌ {{ error }}</div>
   
       <div v-if="result" class="result">
+        
         <div class="section">
-          <h4>🇺🇸 美式发音</h4>
-          <div>音标：<span class="ipa">{{ result.us.ipa || '暂无' }}</span></div>
-          <audio v-if="result.us.audio" :src="result.us.audio" controls />
-        </div>
-  
-        <div class="section">
-          <h4>🇬🇧 英式发音</h4>
-          <div>音标：<span class="ipa">{{ result.uk.ipa || '暂无' }}</span></div>
-          <audio v-if="result.uk.audio" :src="result.uk.audio" controls />
+          <div>UK<span class="ipa">/{{ result.uk.ipa || '暂无' }}/</span></div>
+          <button
+            v-if="result.uk.audio"
+            class="play-btn"
+            @click="playAudio(result.uk.audio)"
+          >
+            🔊
+          </button>
+          <div style="margin-left: 10px;">US<span class="ipa">/{{ result.us.ipa || '暂无' }}/</span></div>
+          <button
+            v-if="result.us.audio"
+            class="play-btn"
+            @click="playAudio(result.us.audio)"
+          >
+            🔊
+          </button>
         </div>
       </div>
+
+
     </div>
   </template>
   
@@ -51,7 +62,7 @@
     error.value = ''
   
     try {
-      const res = await axios.get(`/api/cambridge`, {
+      const res = await axios.get(`http://127.0.0.1:5000/api/cambridge`, {
         params: { word: word.value.trim() }
       })
       result.value = res.data
@@ -61,6 +72,12 @@
       loading.value = false
     }
   }
+
+  const playAudio = (url) => {
+    const audio = new Audio(url)
+    audio.play()
+  }
+
   </script>
   
   <style scoped>
@@ -70,6 +87,10 @@
     border-radius: 8px;
     max-width: 500px;
     font-family: sans-serif;
+    min-height: 150px;
+  }
+  .cambridge-title {
+    margin: 0 0 16px 0;
   }
   .input {
     padding: 6px 10px;
@@ -85,10 +106,16 @@
   }
   .section {
     margin-bottom: 12px;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 12px;
   }
   .ipa {
-    font-family: monospace;
+    margin-left: 8px;
+    font-family: 'Courier New', Courier, monospace;
     font-weight: bold;
+    color: #1a2550;
   }
   .info {
     color: #666;
@@ -97,5 +124,14 @@
     color: red;
     font-weight: bold;
   }
+
+  .play-btn {
+  background: none;
+  border: none;
+  font-size: 1.2rem;
+  cursor: pointer;
+  color: #1a2550;
+  }
+  
 </style>
   

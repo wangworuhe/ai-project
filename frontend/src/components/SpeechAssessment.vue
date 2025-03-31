@@ -175,11 +175,20 @@
                   d="M18 2.0845
                      a 15.9155 15.9155 0 0 1 0 31.831
                      a 15.9155 15.9155 0 0 1 0 -31.831"/>
+
+                <text 
+                  x="18" 
+                  y="14" 
+                  :class="style['score-label']"
+                  dominant-baseline="middle" 
+                  text-anchor="middle">
+                  总分
+                </text>
                 
                 <!-- 中心分数显示 -->
                 <text 
                   x="18" 
-                  y="22" 
+                  y="23" 
                   :class="style['score-value']"
                   dominant-baseline="middle" 
                   text-anchor="middle">
@@ -187,7 +196,7 @@
                 </text>
               </svg>
               <!-- 底部标签 -->
-              <div :class="style['ring-label']">发音总分</div>
+              <!-- <div :class="style['ring-label']">发音总分</div> -->
             </div>
         
             <!-- 右侧条形图 -->
@@ -257,6 +266,15 @@
     </div>
   </div>
 
+  <div class="card-ui">
+    <div :class="style['cambridge-dictionary']">
+      <CambridgeLookup />
+    </div>
+    <div class="google-translate-api">
+      <GoogleTranslateAPI />
+    </div>
+  </div>
+
 </template>
 
 <script setup>
@@ -264,6 +282,8 @@
 import { ref, reactive, computed, onMounted, onBeforeUnmount, nextTick } from 'vue'
 import axios from 'axios'
 import style from '../assets/css/SpeechAssessment.module.css'
+import CambridgeLookup from './CambridgeLookup.vue'
+import GoogleTranslateAPI from './GoogleTranslateAPI.vue'
 
 // 评估输入与结果状态
 const text = ref('')                     // 用户输入的文本
@@ -542,7 +562,6 @@ const assessSpeech = async () => {
       ...w,
       errorType: w.PronunciationAssessment?.ErrorType?.toLowerCase() || 'none'
     }))
-    console.log('评估结果', words.value)
     updateErrorCounts(words.value)  // 更新错误计数器
   } catch (err) {
     console.error('评估失败', err)
