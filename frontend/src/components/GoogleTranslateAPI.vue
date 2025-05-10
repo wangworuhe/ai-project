@@ -3,12 +3,17 @@
     <!-- 语言选择栏 -->
     <div class="language-tabs">
       <div class="language-selector">
+        <span class="language-title">翻译 </span>
         <select v-model="sourceLanguage" class="language-dropdown">
           <option v-for="lang in languages" :key="'src-'+lang.code" :value="lang.code">
             {{ lang.name }}
           </option>
         </select>
-        <span class="separator">→</span>
+        <button class="swap-btn" @click="swapLanguages">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="#5F6368">
+            <path d="M7 8h10v2H7v3l-4-4 4-4v3zm10 8H7v-2h10v-3l4 4-4 4v-3z"/>
+          </svg>
+        </button>
         <select v-model="targetLanguage" class="language-dropdown">
           <option v-for="lang in languages" :key="'tgt-'+lang.code" :value="lang.code">
             {{ lang.name }}
@@ -136,30 +141,71 @@ const translateText = debounce(async () => {
 
 watch([sourceText, sourceLanguage, targetLanguage], translateText)
 
-// const swapLanguages = () => {
-//   [sourceLanguage.value, targetLanguage.value] = [targetLanguage.value, sourceLanguage.value]
-//   if (translatedText.value) {
-//     [sourceText.value, translatedText.value] = [translatedText.value, sourceText.value]
-//   }
-// }
-
-const speak = (text, lang) => {
-  if ('speechSynthesis' in window) {
-    const utterance = new SpeechSynthesisUtterance(text)
-    utterance.lang = lang === 'zh-CN' ? 'zh-CN' : lang === 'en' ? 'en-US' : lang
-    utterance.rate = 0.9
-    window.speechSynthesis.speak(utterance)
+const swapLanguages = () => {
+  [sourceLanguage.value, targetLanguage.value] = [targetLanguage.value, sourceLanguage.value]
+  if (translatedText.value) {
+    [sourceText.value, translatedText.value] = [translatedText.value, sourceText.value]
   }
 }
 
-const speakSource = () => speak(sourceText.value, sourceLanguage.value)
-const speakTranslated = () => speak(translatedText.value, targetLanguage.value)
+// 修改语音合成函数 - 使用Google TTS API
+const playGoogleTTS = (text, lang = 'en') => {
+  if (!text) return;
+  
+  try {
+    // 处理语言代码映射
+    const ttsLang = lang === 'zh-CN' ? 'zh' : lang; // 谷歌TTS使用'zh'而非'zh-CN'
+    
+    // 创建音频元素
+    const audio = new Audio();
+    audio.src = `https://translate.google.com/translate_tts?ie=UTF-8&tl=${ttsLang}&client=tw-ob&q=${encodeURIComponent(text)}`;
+    
+    // 播放音频
+    audio.play().catch(e => {
+      console.error("语音播放失败:", e);
+      // 回退到Web Speech API
+      fallbackTTS(text, lang);
+    });
+    
+  } catch (e) {
+    console.error("语音合成失败:", e);
+    fallbackTTS(text, lang);
+  }
+};
+
+// 回退使用Web Speech API
+const fallbackTTS = (text, lang) => {
+  if ('speechSynthesis' in window) {
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.lang = lang === 'zh-CN' ? 'zh-CN' : lang === 'en' ? 'en-US' : lang;
+    utterance.rate = 0.9;
+    window.speechSynthesis.speak(utterance);
+  } else {
+    console.warn("浏览器不支持语音合成");
+  }
+};
+
+// const speak = (text, lang) => {
+//   if ('speechSynthesis' in window) {
+//     const utterance = new SpeechSynthesisUtterance(text)
+//     utterance.lang = lang === 'zh-CN' ? 'zh-CN' : lang === 'en' ? 'en-US' : lang
+//     utterance.rate = 0.9
+//     window.speechSynthesis.speak(utterance)
+//   }
+// }
+
+// 更新语音按钮函数
+const speakSource = () => playGoogleTTS(sourceText.value, sourceLanguage.value);
+const speakTranslated = () => playGoogleTTS(translatedText.value, targetLanguage.value);
+
+// const speakSource = () => speak(sourceText.value, sourceLanguage.value)
+// const speakTranslated = () => speak(translatedText.value, targetLanguage.value)
 
 const copyTranslation = async () => {
   if (!translatedText.value) return
   try {
     await navigator.clipboard.writeText(translatedText.value)
-    alert('已复制到剪贴板')
+    // alert('已复制到剪贴板')
   } catch (err) {
     console.error('Failed to copy:', err)
   }
@@ -177,7 +223,7 @@ const handleInput = () => {
 .language-selector {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 4px;
 }
 
 .language-dropdown {
@@ -189,58 +235,24 @@ const handleInput = () => {
   background-color: white;
 }
 
-.separator {
-  color: #5F6368;
-  font-size: 16px;
+.language-title {
+  font-size: 18px;
+  font-weight: 600;
 }
 
 /* 保持之前的样式不变 */
 .translate-container {
-  width: 800px;
-  margin: 0 auto;
+  border-top: 1px solid #E0E0EF;
+  padding-top: 10px; 
+  max-width: 800px;
   font-family: 'Roboto', 'Noto Sans SC', sans-serif;
 }
 
 .language-tabs {
   display: flex;
   align-items: center;
-  border-bottom: 1px solid #E0E0EF;
   padding-bottom: 8px;
   margin-bottom: 12px;
-}
-
-.language-tab {
-  padding: 8px 16px;
-  cursor: pointer;
-  color: #5F6368;
-  font-size: 14px;
-  position: relative;
-  transition: all 0.2s;
-}
-
-.language-tab.active {
-  color: #4285F4;
-  font-weight: 500;
-}
-
-.language-tab.active::after {
-  content: '';
-  position: absolute;
-  bottom: -9px;
-  left: 0;
-  width: 100%;
-  height: 2px;
-  background: #4285F4;
-}
-
-.language-swap {
-  padding: 0 12px;
-  cursor: pointer;
-  transition: transform 0.3s;
-}
-
-.language-swap:hover {
-  transform: rotate(180deg);
 }
 
 .translation-panels {
@@ -254,8 +266,32 @@ const handleInput = () => {
   border-radius: 8px;
   display: flex;
   flex-direction: column;
-  height: 200px;
+  height: 150px;
   overflow: hidden;
+}
+
+.swap-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 4px;
+  transition: all 0.3s;
+  display: flex;
+  align-items: center;
+}
+
+.swap-btn:hover {
+  background-color: #f1f3f4;
+}
+
+.swap-btn svg {
+  transition: transform 0.3s;
+}
+
+.swap-btn:hover svg {
+  fill: #4285F4;
+  transform: rotate(180deg);
 }
 
 textarea {
@@ -308,7 +344,7 @@ textarea {
   opacity: 1;
 }
 
-@media (max-width: 840px) {
+/* @media (max-width: 840px) {
   .translate-container {
     width: 100%;
     padding: 0 12px;
@@ -321,5 +357,5 @@ textarea {
   .input-panel, .output-panel {
     height: 160px;
   }
-}
+} */
 </style>

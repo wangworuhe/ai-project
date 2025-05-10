@@ -325,7 +325,7 @@
 .text-display > span {
   display: inline-block;
   margin: 2px;
-  padding: 1px 8px;
+  padding: 1px 5px;
   transition: 
     transform 0.15s ease,
     background 0.2s ease;
@@ -639,21 +639,21 @@
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
   transition: box-shadow 0.3s ease; */
   margin-left: 40px; 
-  max-width: 500px;
+  max-width: 630px;
 }
 
 
 
 .google-translate-api {
-  background-color: #fff;
+  /* background-color: #fff;
   border: 1px solid #ddd;
   border-radius: 4px;
   padding: 16px;
   margin: 16px 0;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-  transition: box-shadow 0.3s ease;
+  transition: box-shadow 0.3s ease; */
+  margin-left: 40px; 
+  margin-top: 15px; 
+  max-width: 630px;
 }
 
-.google-translate-api:hover {
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
-}

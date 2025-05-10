@@ -11,7 +11,7 @@ azure-venv\Scripts\activate
 flask --app run.py run
 
 前端项目
-cd .\ai-project\frontend\
+cd .\frontend\
 npm run serve
 
 退出环境
@@ -31,4 +31,10 @@ flask --app run.py db upgrade
 
 npm run serve
 
+# 打包
 git archive --format=zip HEAD -o ai-project.zip
+
+
+git commit -a -m "somethings"
+git push origin kailasa
+

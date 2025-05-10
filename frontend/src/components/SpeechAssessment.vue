@@ -270,7 +270,7 @@
     <div :class="style['cambridge-dictionary']">
       <CambridgeLookup />
     </div>
-    <div class="google-translate-api">
+    <div :class="style['google-translate-api']">
       <GoogleTranslateAPI />
     </div>
   </div>
@@ -563,6 +563,7 @@ const assessSpeech = async () => {
       errorType: w.PronunciationAssessment?.ErrorType?.toLowerCase() || 'none'
     }))
     updateErrorCounts(words.value)  // 更新错误计数器
+    console.log("words.value:", words.value)
   } catch (err) {
     console.error('评估失败', err)
     errorMessage.value = err.response?.data?.message || err.message || '连接失败'

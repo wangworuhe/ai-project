@@ -85,7 +85,7 @@
     border: 1px solid #ccc;
     padding: 16px;
     border-radius: 8px;
-    max-width: 500px;
+    max-width: 800px;
     font-family: sans-serif;
     min-height: 150px;
   }
