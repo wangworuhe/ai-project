@@ -3,10 +3,12 @@ import os
 import logging
 from logging.config import dictConfig
 
+from config.config import Config
+
 def configure_logging():
     """动态配置日志系统（支持环境变量覆盖）"""
     log_level = os.getenv("LOG_LEVEL", "INFO").upper()
-    log_file = os.getenv("LOG_FILE", "logs/app.log")
+    log_file = Config.LOG_FILE
 
     # 确保日志目录存在
     os.makedirs(os.path.dirname(log_file), exist_ok=True)

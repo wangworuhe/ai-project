@@ -280,7 +280,7 @@
 <script setup>
 // 导入依赖
 import { ref, reactive, computed, onMounted, onBeforeUnmount, nextTick } from 'vue'
-import axios from 'axios'
+import api from '@/api'
 import style from '../assets/css/SpeechAssessment.module.css'
 import CambridgeLookup from './CambridgeLookup.vue'
 import GoogleTranslateAPI from './GoogleTranslateAPI.vue'
@@ -546,7 +546,7 @@ const assessSpeech = async () => {
   formData.append('reference_text', text.value)
 
   try {
-    const res = await axios.post('http://127.0.0.1:5000/assessment/upload', formData, {
+    const res = await api.post('/assessment/upload', formData, {
       headers: { 'Content-Type': 'multipart/form-data' }
     })
     const data = res.data.data

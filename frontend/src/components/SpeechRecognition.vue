@@ -7,7 +7,7 @@
   </template>
   
   <script>
-  import axios from "axios";
+  import api from "@/api";
   
   export default {
     data() {
@@ -17,10 +17,9 @@
     },
     methods: {
       async startSTT() {
-        const res = await axios.get("http://127.0.0.1:5000/stt/recognize-mic");
+        const res = await api.get("/stt/recognize-mic");
         this.recognizedText = res.data.data.text;
       }
     }
   };
   </script>
-  

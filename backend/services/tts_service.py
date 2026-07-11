@@ -3,6 +3,7 @@ import uuid
 import azure.cognitiveservices.speech as speechsdk
 
 from flask import current_app
+from config.config import Config
 
 def _build_ssml(text, locale, voice, style, styledegree, role, rate, pitch, volume):
     # prosody
@@ -63,10 +64,10 @@ def text_to_speech(text, locale="en-US", voice="en-US-JennyNeural",
         return {"error": f"TTS 失败: {err}"}
 
     # 写文件
-    out_dir = "./outputs"
+    out_dir = Config.OUTPUT_DIR
     os.makedirs(out_dir, exist_ok=True)
     filename = f"{uuid.uuid4().hex}.mp3"
     path = os.path.join(out_dir, filename)
     with open(path, "wb") as f:
         f.write(result.audio_data)  # type: ignore
-    return {"file": path}
+    return {"file": path, "url": f"/api/media/{filename}"}

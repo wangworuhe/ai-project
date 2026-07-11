@@ -48,7 +48,7 @@
 
 <script setup>
   import { ref } from 'vue'
-  import axios from 'axios'
+  import api from '@/api'
   
   const word = ref('')
   const loading = ref(false)
@@ -62,7 +62,7 @@
     error.value = ''
   
     try {
-      const res = await axios.get(`http://127.0.0.1:5000/api/cambridge`, {
+      const res = await api.get('/cambridge', {
         params: { word: word.value.trim() }
       })
       result.value = res.data
@@ -132,6 +132,5 @@
   cursor: pointer;
   color: #1a2550;
   }
-  
+
 </style>
-  

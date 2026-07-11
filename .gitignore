@@ -45,6 +45,7 @@ azure-venv/
 # 音频内容
 outputs/*
 uploads/*
+storage/*
 # !uploads/.gitkeep
 # !outputs/.gitkeep
 

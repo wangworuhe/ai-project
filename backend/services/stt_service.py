@@ -1,5 +1,6 @@
 import azure.cognitiveservices.speech as speechsdk
 import os
+from werkzeug.utils import secure_filename
 
 speech_key = os.getenv("AZURE_SPEECH_KEY")
 service_region = os.getenv("AZURE_SPEECH_REGION")
@@ -20,7 +21,9 @@ def recognize_speech_mic(output_folder):
 
 def recognize_speech_file(audio_file, output_folder):
     """ 识别上传的音频文件，并保存 """
-    file_path = os.path.join(output_folder, audio_file.filename)
+    os.makedirs(output_folder, exist_ok=True)
+    filename = secure_filename(audio_file.filename) or "uploaded_audio.wav"
+    file_path = os.path.join(output_folder, filename)
     audio_file.save(file_path)
 
     speech_config = speechsdk.SpeechConfig(subscription=speech_key, region=service_region)

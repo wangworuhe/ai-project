@@ -7,11 +7,12 @@ import ffmpeg
 import json
 import logging
 from flask import request, current_app
+from config.config import Config
 
 speech_key = os.getenv("AZURE_SPEECH_KEY")
 service_region = os.getenv("AZURE_SPEECH_REGION")
 
-UPLOAD_FOLDER = "uploads/kailasa"  # 存储音频的目录
+UPLOAD_FOLDER = os.path.join(Config.UPLOAD_DIR, "assessment")
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)  # 确保目录存在
 
 def save_audio_file(audio_blob, user_id):
@@ -22,8 +23,8 @@ def save_audio_file(audio_blob, user_id):
     webm_filename = f"recording_{timestamp}.webm"
     wav_filename = f"recording_{timestamp}.wav"
 
-    webm_path = os.path.join(UPLOAD_FOLDER, webm_filename).replace("\\", "/")
-    wav_path = os.path.join(UPLOAD_FOLDER, wav_filename).replace("\\", "/")
+    webm_path = os.path.join(UPLOAD_FOLDER, webm_filename)
+    wav_path = os.path.join(UPLOAD_FOLDER, wav_filename)
 
     # **保存 WebM 文件**
     audio_blob.save(webm_path)

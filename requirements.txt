@@ -2,3 +2,11 @@ Flask>=2.0.1
 Flask-SQLAlchemy>=2.5.1
 flask-cors
 flask-migrate
+azure-cognitiveservices-speech
+beautifulsoup4
+ffmpeg-python
+googletrans==4.0.2
+pydub
+python-dotenv
+requests
+socksio

@@ -1,4 +1,4 @@
-from flask import Flask
+from flask import Flask, send_from_directory
 from config.config import Config
 from config.logging_config import configure_logging
 from backend.extensions import db, migrate
@@ -25,10 +25,14 @@ def create_app():
     migrate.init_app(app, db)
 
     # 注册蓝图
-    app.register_blueprint(tts_bp, url_prefix="/tts")
-    app.register_blueprint(stt_bp, url_prefix="/stt")
-    app.register_blueprint(assessment_bp, url_prefix="/assessment")
-    app.register_blueprint(translation_bp, url_prefix="/translation")
+    app.register_blueprint(tts_bp, url_prefix="/api/tts")
+    app.register_blueprint(stt_bp, url_prefix="/api/stt")
+    app.register_blueprint(assessment_bp, url_prefix="/api/assessment")
+    app.register_blueprint(translation_bp, url_prefix="/api/translation")
     app.register_blueprint(cambridge_bp)
+
+    @app.get("/api/media/<path:filename>")
+    def media_file(filename):
+        return send_from_directory(app.config["OUTPUT_DIR"], filename)
 
     return app

@@ -44,7 +44,7 @@ def synthesize_tts():
         db.session.add(log)
         db.session.commit()
 
-        return jsonify({"status":"success","data":{"file":resp["file"]}})
+        return jsonify({"status":"success","data":{"file":resp["url"]}})
 
     except Exception as e:
         current_app.logger.exception("synthesize_tts 异常")

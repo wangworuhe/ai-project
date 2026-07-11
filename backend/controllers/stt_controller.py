@@ -3,8 +3,9 @@ from backend.services.stt_service import recognize_speech_mic, recognize_speech_
 from backend.extensions import db
 from backend.models.recording import Recording
 import os
+from config.config import Config
 
-UPLOAD_FOLDER = "./outputs/"  # 录音存储目录
+UPLOAD_FOLDER = Config.OUTPUT_DIR
 
 def recognize_speech():
     """ 处理麦克风语音识别请求 """

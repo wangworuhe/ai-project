@@ -1,46 +1,65 @@
-# Flask Web Project
+# Flask + Vue Speech Project
 
-This is a simple Flask web project with SQLite database.
+项目由 Flask 后端、Vue 3 前端和 SQLite 数据库组成。
 
-## Installation
+## macOS 本地运行
 
-启动虚拟环境
-azure-venv\Scripts\activate
+后端：
 
-运行flask
-flask --app run.py run
+```bash
+python3 -m venv .venv
+.venv/bin/python -m pip install -r requirements.txt
+.venv/bin/python -m flask --app run.py run
+```
 
-前端项目
-cd .\frontend\
+前端：
+
+```bash
+cd frontend
+npm install
 npm run serve
+```
 
-退出环境
-deactivate
-初始化配置文件
-pip install -r requirements.txt
+默认访问地址：
 
-set FLASK_APP=run.py
-flask run
+- 前端：`http://127.0.0.1:8080`
+- 后端 API：`http://127.0.0.1:5000/api`
 
-flask --app run.py run
+## 环境配置
 
-数据迁移
-flask --app run.py db init
-flask --app run.py db migrate -m "update migration."
-flask --app run.py db upgrade
+项目根目录的 `.env` 用于本地密钥配置，并已被 Git 忽略：
 
-npm run serve
+```dotenv
+AZURE_SPEECH_KEY=
+AZURE_SPEECH_REGION=
+LOG_LEVEL=INFO
+```
 
-# 打包
-git archive --format=zip HEAD -o ai-project.zip
+## 项目内运行数据
 
+运行时文件统一保存在项目根目录的 `storage/` 中：
 
-git commit -a -m "somethings"
-git push origin kailasa
+```text
+storage/
+├── database/database.db
+├── logs/app.log
+├── outputs/
+└── uploads/assessment/
+```
 
-# 表处理
-sqlite3 database.db
-DELETE FROM alembic_version;
+`storage/` 已被 Git 忽略，不会提交数据库、日志、录音或合成音频。
 
+## 数据库迁移
 
-curl -X POST http://localhost:5000/tts/synthesize -H "Content-Type: application/json" -d '{"text":"你好，世界","voice":"zh-CN-XiaoxiaoNeural","style":"cheerful","rate":"+10%"}'
+```bash
+.venv/bin/python -m flask --app run.py db migrate -m "update migration"
+.venv/bin/python -m flask --app run.py db upgrade
+```
+
+## TTS 测试
+
+```bash
+curl -X POST http://127.0.0.1:5000/api/tts/synthesize \
+  -H "Content-Type: application/json" \
+  -d '{"text":"你好，世界","voice":"zh-CN-XiaoxiaoNeural","style":"cheerful","rate":"+10%"}'
+```

@@ -94,7 +94,7 @@
 
 <script setup>
 import { ref } from 'vue'
-import axios from 'axios'
+import api from '@/api'
 import { ElMessage } from 'element-plus'
 
 // 可根据项目需求，未来改为从后端 /voices 接口拉取
@@ -125,7 +125,7 @@ const onSynthesize = async () => {
   loading.value = true
   audioUrl.value = ''
   try {
-    const { data } = await axios.post('http://127.0.0.1:5000/tts/synthesize', form.value)
+    const { data } = await api.post('/tts/synthesize', form.value)
     if (data.status === 'success') {
       // 接口返回的是相对路径
       audioUrl.value = data.data.file
