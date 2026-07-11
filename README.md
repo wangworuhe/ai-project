@@ -38,3 +38,9 @@ git archive --format=zip HEAD -o ai-project.zip
 git commit -a -m "somethings"
 git push origin kailasa
 
+# 表处理
+sqlite3 database.db
+DELETE FROM alembic_version;
+
+
+curl -X POST http://localhost:5000/tts/synthesize -H "Content-Type: application/json" -d '{"text":"你好，世界","voice":"zh-CN-XiaoxiaoNeural","style":"cheerful","rate":"+10%"}'

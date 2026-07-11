@@ -1,7 +1,7 @@
 <template>
   <!-- ✅ 按钮绑定：使用 controlButtons 配置渲染按钮 -->
   <div :class="style['assessment-container']">
-    <div :class="style['global-title']">语音评估</div>
+    <!-- <div :class="style['global-title']">语音评估</div> -->
 
     <div :class="style['left-panel']">
       <div :class="style['input-section']">

@@ -18,10 +18,6 @@ def create_app():
 
     app = Flask(__name__)
     app.config.from_object('config.config.Config')
-    
-    # 移除 Flask 默认的日志处理器（可选）
-    # from flask.logging import default_handler
-    # app.logger.removeHandler(default_handler)
 
     CORS(app)  # 允许所有来源访问
 
