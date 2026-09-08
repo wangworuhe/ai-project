@@ -1,0 +1,4 @@
+interface:
+  display_name: "Grammar Unit 验证"
+  short_description: "逐项核对语法单元的原书内容、数据库结构、媒体和答案关联"
+  default_prompt: "Use $grammar-unit-validate to validate one imported grammar Unit against the source PDF, database, API, and rendered page."

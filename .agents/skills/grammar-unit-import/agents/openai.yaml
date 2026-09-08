@@ -1,0 +1,4 @@
+interface:
+  display_name: "Grammar Unit 顺序导入"
+  short_description: "按照原书顺序逐个导入并验证语法单元正文、练习和答案关联"
+  default_prompt: "Use $grammar-unit-import to import the requested grammar Units one at a time with validation after each Unit."

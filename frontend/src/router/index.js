@@ -2,13 +2,17 @@ import { createRouter, createWebHistory } from "vue-router";
 import SpeechAssessment from "@/components/SpeechAssessment.vue";
 import SpeechRecognition from "@/components/SpeechRecognition.vue";
 import SpeechSynthesize from "@/components/SpeechSynthesize.vue";
+import GoogleTts from "@/components/GoogleTts.vue";
+import GrammarPractice from "@/components/GrammarPractice.vue";
 
 
 export const routes = [
   { path: "/", redirect: "/assessment" },
   { path: "/assessment",  component: SpeechAssessment },
   { path: "/recognition", component: SpeechRecognition },
-  { path: "/synthesize",  component: SpeechSynthesize }
+  { path: "/synthesize",  component: SpeechSynthesize },
+  { path: "/google-tts", component: GoogleTts },
+  { path: "/grammar", component: GrammarPractice }
 ];
 
 const router = createRouter({

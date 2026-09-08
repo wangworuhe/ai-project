@@ -6,7 +6,10 @@ azure-cognitiveservices-speech
 beautifulsoup4
 ffmpeg-python
 googletrans==4.0.2
+gTTS>=2.5,<3
+jsonschema>=4.21,<5
 pydub
 python-dotenv
 requests
 socksio
+waitress>=3.0,<4

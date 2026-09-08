@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.yala.ai-project.caddy</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>__CADDY_BIN__</string>
+    <string>run</string>
+    <string>--config</string>
+    <string>__PROJECT_ROOT__/storage/caddy/Caddyfile</string>
+    <string>--adapter</string>
+    <string>caddyfile</string>
+  </array>
+  <key>WorkingDirectory</key>
+  <string>__PROJECT_ROOT__</string>
+  <key>RunAtLoad</key>
+  <true/>
+  <key>KeepAlive</key>
+  <true/>
+  <key>ThrottleInterval</key>
+  <integer>10</integer>
+  <key>StandardOutPath</key>
+  <string>__PROJECT_ROOT__/storage/logs/caddy.launchd.out.log</string>
+  <key>StandardErrorPath</key>
+  <string>__PROJECT_ROOT__/storage/logs/caddy.launchd.err.log</string>
+</dict>
+</plist>

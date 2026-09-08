@@ -29,7 +29,9 @@
 const navs = [
   { path: "/assessment",  label: "语音评估" },
   { path: "/recognition", label: "语音识别" },
-  { path: "/synthesize",   label: "语音合成" } // SpeechSynthesize
+  { path: "/synthesize",   label: "Azure 语音合成" },
+  { path: "/google-tts",   label: "Google 语音合成" },
+  { path: "/grammar", label: "英语语法练习" }
 ];
 </script>
 

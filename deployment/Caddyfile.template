@@ -1,0 +1,23 @@
+{
+    auto_https off
+}
+
+:8080 {
+    bind 127.0.0.1
+
+    log {
+        output file __PROJECT_ROOT__/storage/logs/caddy.access.log
+        format json
+    }
+
+    @api path /api/*
+    handle @api {
+        reverse_proxy 127.0.0.1:5000
+    }
+
+    handle {
+        root * __PROJECT_ROOT__/frontend/dist
+        try_files {path} /index.html
+        file_server
+    }
+}

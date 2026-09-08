@@ -1,9 +1,6 @@
-import os
-import uuid
 import azure.cognitiveservices.speech as speechsdk
 
-from flask import current_app
-from config.config import Config
+from backend.services.audio_output_service import create_timestamped_mp3_path
 
 def _build_ssml(text, locale, voice, style, styledegree, role, rate, pitch, volume):
     # prosody
@@ -64,10 +61,7 @@ def text_to_speech(text, locale="en-US", voice="en-US-JennyNeural",
         return {"error": f"TTS 失败: {err}"}
 
     # 写文件
-    out_dir = Config.OUTPUT_DIR
-    os.makedirs(out_dir, exist_ok=True)
-    filename = f"{uuid.uuid4().hex}.mp3"
-    path = os.path.join(out_dir, filename)
+    path, media_path = create_timestamped_mp3_path("azure")
     with open(path, "wb") as f:
         f.write(result.audio_data)  # type: ignore
-    return {"file": path, "url": f"/api/media/{filename}"}
+    return {"file": path, "url": f"/api/media/{media_path}"}
