@@ -10,7 +10,10 @@ from backend.extensions import db
 from backend.models.grammar import (
     GrammarAttemptAnswer,
     GrammarAttemptSession,
+    GrammarExercise,
     GrammarMistakeEntry,
+    GrammarQuestion,
+    GrammarUnit,
 )
 
 
@@ -22,16 +25,9 @@ class MistakeQueryError(ValueError):
     """A client-visible mistake-book query validation failure."""
 
 
-def apply_attempt_answer(answer, profile_key, practiced_at=None):
-    """Apply one definitive answer outcome to the current mistake-book state."""
+def _apply_to_entry(answer, profile_key, entry, practiced_at=None):
     if answer.outcome not in {"correct", "incorrect"}:
         return None
-    if answer.id is None:
-        db.session.flush()
-
-    entry = GrammarMistakeEntry.query.filter_by(
-        profile_key=profile_key, question_id=answer.question_id
-    ).first()
     if entry is not None and entry.latest_attempt_answer_id >= answer.id:
         return entry
 
@@ -76,8 +72,24 @@ def apply_attempt_answer(answer, profile_key, practiced_at=None):
     return entry
 
 
+def apply_attempt_answer(answer, profile_key, practiced_at=None):
+    """Apply one definitive answer outcome to the current mistake-book state."""
+    if answer.outcome not in {"correct", "incorrect"}:
+        return None
+    if answer.id is None:
+        db.session.flush()
+    entry = GrammarMistakeEntry.query.filter_by(
+        profile_key=profile_key, question_id=answer.question_id
+    ).first()
+    return _apply_to_entry(answer, profile_key, entry, practiced_at)
+
+
 def sync_existing_attempts():
     """Backfill or catch up the projection without changing attempt evidence."""
+    entries = {
+        (entry.profile_key, entry.question_id): entry
+        for entry in GrammarMistakeEntry.query.all()
+    }
     answers = (
         GrammarAttemptAnswer.query
         .join(GrammarAttemptSession)
@@ -86,11 +98,15 @@ def sync_existing_attempts():
         .all()
     )
     for answer in answers:
-        apply_attempt_answer(
+        key = (answer.session.profile_key, answer.question_id)
+        entry = _apply_to_entry(
             answer,
             answer.session.profile_key,
+            entries.get(key),
             practiced_at=answer.session.submitted_at,
         )
+        if entry is not None:
+            entries[key] = entry
     db.session.commit()
 
 
@@ -147,19 +163,22 @@ def list_mistakes(scope="active", unit_number=None):
 
     profile_key = current_app.config["GRAMMAR_DRAFT_PROFILE"]
     base = GrammarMistakeEntry.query.filter_by(profile_key=profile_key)
+    if unit_number is not None:
+        base = (
+            base.join(GrammarMistakeEntry.question)
+            .join(GrammarQuestion.exercise)
+            .join(GrammarExercise.unit)
+            .filter(GrammarUnit.unit_number == unit_number)
+        )
     all_entries = base.all()
     query = base
     if scope == "active":
         query = query.filter(GrammarMistakeEntry.status.in_(("reviewing", "improving")))
     elif scope != "all":
-        query = query.filter_by(status=scope)
-    # Unit filtering is applied after serialization to avoid joining the same
-    # attempt table through both latest-answer foreign keys.
+        query = query.filter(GrammarMistakeEntry.status == scope)
     entries = [_serialize_entry(item) for item in query.order_by(
         GrammarMistakeEntry.last_practiced_at.desc(), GrammarMistakeEntry.id.desc()
     ).all()]
-    if unit_number is not None:
-        entries = [item for item in entries if item["unit_number"] == unit_number]
     summary = {
         "total": len(all_entries),
         "active": sum(item.status in {"reviewing", "improving"} for item in all_entries),

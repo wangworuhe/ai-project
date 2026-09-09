@@ -140,9 +140,9 @@
                   <button
                     type="button"
                     class="submit-answers"
-                    :disabled="submitting || !answerableCount"
+                    :disabled="submitting || !answerableCount || Boolean(submission)"
                     @click="submitAnswers"
-                  >{{ submitting ? '正在判题…' : '提交并判题' }}</button>
+                  >{{ submitting ? '正在判题…' : submission ? '已完成判题' : '提交并判题' }}</button>
                   <button type="button" @click="showOriginalPage = !showOriginalPage">
                     {{ showOriginalPage ? '收起原页' : '查看原页' }}
                   </button>
@@ -645,15 +645,21 @@ const selectSection = section => {
   router.replace({ query })
 }
 
-const reviewMistake = item => {
+const reviewMistake = async item => {
   if (submitting.value) return
-  router.replace({
+  await router.replace({
     query: {
       unit: String(item.unit_number),
       section: 'exercise',
       question: String(item.question_id)
     }
   })
+  if (structuredUnit.value?.number === item.unit_number) {
+    await nextTick()
+    document.querySelector(`[data-question-id="${item.question_id}"]`)?.scrollIntoView({
+      behavior: 'smooth', block: 'center'
+    })
+  }
 }
 
 const focusAdjacentAnswer = async event => {

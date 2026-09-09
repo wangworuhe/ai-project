@@ -163,6 +163,12 @@ class GrammarMistakeBookTest(unittest.TestCase):
         self.assertEqual(result["items"][0]["latest_wrong"]["user_answers"], {
             "answer-1": "Why are you cring?"
         })
+        unit_result = list_mistakes("reviewing", unit_number=1)
+        self.assertEqual(unit_result["summary"]["reviewing"], 1)
+        self.assertEqual(len(unit_result["items"]), 1)
+        other_unit = list_mistakes("active", unit_number=2)
+        self.assertEqual(other_unit["summary"]["total"], 0)
+        self.assertEqual(other_unit["items"], [])
 
 
 if __name__ == "__main__":
