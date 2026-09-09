@@ -110,6 +110,7 @@ class GrammarMedia(db.Model):
     __tablename__ = "grammar_media"
     __table_args__ = (
         db.UniqueConstraint("book_id", "sha256", name="uq_grammar_media_book_sha256"),
+        db.UniqueConstraint("unit_id", "asset_key", name="uq_grammar_media_unit_asset_key"),
     )
 
     id = db.Column(db.Integer, primary_key=True)
@@ -119,6 +120,7 @@ class GrammarMedia(db.Model):
     unit_id = db.Column(
         db.Integer, db.ForeignKey("grammar_units.id", ondelete="SET NULL"), nullable=True, index=True
     )
+    asset_key = db.Column(db.String(100), nullable=True)
     mime_type = db.Column(db.String(100), nullable=False)
     content_blob = db.Column(db.LargeBinary, nullable=False)
     width = db.Column(db.Integer, nullable=True)
@@ -154,6 +156,7 @@ class GrammarExercise(db.Model):
     source_page = db.Column(db.Integer, nullable=False)
     source_bbox = db.Column(db.JSON, nullable=True)
     sort_order = db.Column(db.Integer, nullable=False)
+    is_active = db.Column(db.Boolean, nullable=False, default=True, index=True)
     created_at = db.Column(db.DateTime, nullable=False, default=db.func.current_timestamp())
     updated_at = db.Column(
         db.DateTime,
@@ -192,6 +195,7 @@ class GrammarQuestion(db.Model):
     is_example = db.Column(db.Boolean, nullable=False, default=False)
     source_page = db.Column(db.Integer, nullable=False)
     source_bbox = db.Column(db.JSON, nullable=True)
+    is_active = db.Column(db.Boolean, nullable=False, default=True, index=True)
     created_at = db.Column(db.DateTime, nullable=False, default=db.func.current_timestamp())
     updated_at = db.Column(
         db.DateTime,
@@ -230,6 +234,7 @@ class GrammarAnswerSlot(db.Model):
     answer_type = db.Column(db.String(32), nullable=False, default="text")
     normalization_rule = db.Column(db.String(48), nullable=False, default="english-text")
     points = db.Column(db.Numeric(6, 2), nullable=False, default=1)
+    is_active = db.Column(db.Boolean, nullable=False, default=True, index=True)
     created_at = db.Column(db.DateTime, nullable=False, default=db.func.current_timestamp())
 
     question = db.relationship("GrammarQuestion", back_populates="answer_slots")
@@ -355,6 +360,75 @@ class GrammarAnswerVariant(db.Model):
     created_at = db.Column(db.DateTime, nullable=False, default=db.func.current_timestamp())
 
     solution = db.relationship("GrammarSolution", back_populates="variants")
+
+
+class GrammarDraft(db.Model):
+    """One server-side working draft for a profile and a grammar Unit."""
+
+    __tablename__ = "grammar_drafts"
+    __table_args__ = (
+        db.UniqueConstraint(
+            "profile_key", "unit_id", name="uq_grammar_draft_profile_unit"
+        ),
+    )
+
+    id = db.Column(db.Integer, primary_key=True)
+    profile_key = db.Column(db.String(64), nullable=False, index=True)
+    unit_id = db.Column(
+        db.Integer,
+        db.ForeignKey("grammar_units.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    created_at = db.Column(db.DateTime, nullable=False, default=db.func.current_timestamp())
+    updated_at = db.Column(
+        db.DateTime,
+        nullable=False,
+        default=db.func.current_timestamp(),
+        onupdate=db.func.current_timestamp(),
+    )
+
+    unit = db.relationship("GrammarUnit")
+    answers = db.relationship(
+        "GrammarDraftAnswer", back_populates="draft", cascade="all, delete-orphan"
+    )
+
+
+class GrammarDraftAnswer(db.Model):
+    """The latest unsubmitted value for one stable answer slot."""
+
+    __tablename__ = "grammar_draft_answers"
+    __table_args__ = (
+        db.UniqueConstraint(
+            "draft_id", "answer_slot_id", name="uq_grammar_draft_answer_slot"
+        ),
+    )
+
+    id = db.Column(db.Integer, primary_key=True)
+    draft_id = db.Column(
+        db.Integer,
+        db.ForeignKey("grammar_drafts.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    answer_slot_id = db.Column(
+        db.Integer,
+        db.ForeignKey("grammar_answer_slots.id", ondelete="RESTRICT"),
+        nullable=False,
+        index=True,
+    )
+    answer_text = db.Column(db.Text, nullable=False)
+    question_content_sha256 = db.Column(db.String(64), nullable=False)
+    created_at = db.Column(db.DateTime, nullable=False, default=db.func.current_timestamp())
+    updated_at = db.Column(
+        db.DateTime,
+        nullable=False,
+        default=db.func.current_timestamp(),
+        onupdate=db.func.current_timestamp(),
+    )
+
+    draft = db.relationship("GrammarDraft", back_populates="answers")
+    answer_slot = db.relationship("GrammarAnswerSlot")
 
 
 class GrammarAttempt(db.Model):

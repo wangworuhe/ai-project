@@ -51,7 +51,11 @@ def parse_args() -> argparse.Namespace:
     source.add_argument("--unit", type=int, help="load unit-NNN.json from the package directory")
     source.add_argument("--package", type=Path, help="explicit Unit package path")
     parser.add_argument("--cache", type=Path, help="specific completed source-cache directory")
-    parser.add_argument("--replace", action="store_true", help="replace an already imported Unit")
+    parser.add_argument(
+        "--replace",
+        action="store_true",
+        help="update an already imported Unit in place while preserving stable record IDs",
+    )
     parser.add_argument("--validate-only", action="store_true", help="validate without changing SQLite")
     parser.add_argument(
         "--status", choices=("importing", "reviewed", "published"),
@@ -293,7 +297,7 @@ def import_package(
     *,
     replace: bool,
     status_override: str | None,
-) -> dict[str, int]:
+) -> dict[str, int | str]:
     book_data = package["book"]
     unit_data = package["unit"]
     source = manifest["source"]
@@ -320,60 +324,92 @@ def import_package(
         book.total_pages = manifest["page_count"]
 
     number = unit_data["number"]
-    existing = GrammarUnit.query.filter_by(book_id=book.id, unit_number=number).first()
-    if existing and not replace:
-        raise ValueError(f"Unit {number} already exists; use --replace to rebuild it")
-    if existing:
-        for item in list(existing.media):
-            db.session.delete(item)
-        db.session.delete(existing)
-        db.session.flush()
-
-    unit = GrammarUnit(
-        book=book,
-        unit_number=number,
-        title=unit_data["title"],
-        grammar_point=unit_data["grammar_point"],
-        body_source_page=unit_data["body_page"],
-        exercise_source_page=unit_data["exercise_page"],
-        sort_order=unit_data["sort_order"],
-        status=status_override or unit_data["status"],
-    )
-    db.session.add(unit)
+    unit = GrammarUnit.query.filter_by(book_id=book.id, unit_number=number).first()
+    if unit and not replace:
+        raise ValueError(f"Unit {number} already exists; use --replace to update it")
+    operation = "updated" if unit else "created"
+    if unit is None:
+        unit = GrammarUnit(book=book, unit_number=number)
+        db.session.add(unit)
+    unit.title = unit_data["title"]
+    unit.grammar_point = unit_data["grammar_point"]
+    unit.body_source_page = unit_data["body_page"]
+    unit.exercise_source_page = unit_data["exercise_page"]
+    unit.sort_order = unit_data["sort_order"]
+    unit.status = status_override or unit_data["status"]
+    db.session.flush()
 
     media_by_key: dict[str, GrammarMedia] = {}
+    existing_media = {item.asset_key: item for item in unit.media if item.asset_key}
+    legacy_media = [item for item in unit.media if not item.asset_key]
     for key, definition in package["media"].items():
         data = crop_jpeg(
             cache / "renders" / f"page-{definition['page']:03d}.jpg",
             definition["crop"],
         )
-        item = GrammarMedia(
-            book=book,
-            unit=unit,
-            mime_type="image/jpeg",
-            content_blob=data,
-            width=definition["crop"]["width"],
-            height=definition["crop"]["height"],
-            sha256=hashlib.sha256(data).hexdigest(),
-            alt_text=definition["alt"],
-            source_page=definition["page"],
-            source_bbox={"coordinate_space": "render-96dpi", **definition["crop"]},
-        )
-        db.session.add(item)
+        digest = hashlib.sha256(data).hexdigest()
+        source_bbox = {"coordinate_space": "render-96dpi", **definition["crop"]}
+        item = existing_media.pop(key, None)
+        if item is None:
+            item = next(
+                (
+                    candidate for candidate in legacy_media
+                    if candidate.source_page == definition["page"]
+                    and candidate.source_bbox == source_bbox
+                ),
+                None,
+            )
+            if item is not None:
+                legacy_media.remove(item)
+        if item is None:
+            previous_key = next(
+                (
+                    previous_key
+                    for previous_key, candidate in existing_media.items()
+                    if candidate.sha256 == digest
+                ),
+                None,
+            )
+            if previous_key is not None:
+                item = existing_media.pop(previous_key)
+        if item is None:
+            item = GrammarMedia(book=book, unit=unit)
+            db.session.add(item)
+        item.asset_key = key
+        item.mime_type = "image/jpeg"
+        item.content_blob = data
+        item.width = definition["crop"]["width"]
+        item.height = definition["crop"]["height"]
+        item.sha256 = digest
+        item.alt_text = definition["alt"]
+        item.source_page = definition["page"]
+        item.source_bbox = source_bbox
         media_by_key[key] = item
     db.session.flush()
 
     body = package["body"]
     heading_start, heading_end = body["heading_range"]
     page, heading_blocks = source_blocks(cache, body["page"], heading_start, heading_end)
-    unit.content_blocks.append(GrammarContentBlock(
-        section="body",
-        block_type="heading",
-        content_json={"text": unit.title, "source_blocks": heading_blocks},
-        source_page=body["page"],
-        source_bbox=[0, heading_start, page["width"], heading_end],
-        sort_order=0,
-    ))
+    existing_blocks: dict[str, GrammarContentBlock] = {}
+    for block in unit.content_blocks:
+        key = "heading" if block.block_type == "heading" else (
+            f"section:{(block.content_json or {}).get('label')}"
+        )
+        existing_blocks[key] = block
+        # Free the unique (unit, section, sort_order) values before reordering.
+        block.sort_order = -(block.id or 0) - 1
+    db.session.flush()
+
+    heading = existing_blocks.pop("heading", None)
+    if heading is None:
+        heading = GrammarContentBlock(unit=unit)
+        db.session.add(heading)
+    heading.section = "body"
+    heading.block_type = "heading"
+    heading.content_json = {"text": unit.title, "source_blocks": heading_blocks}
+    heading.source_page = body["page"]
+    heading.source_bbox = [0, heading_start, page["width"], heading_end]
+    heading.sort_order = 0
     for order, section in enumerate(body["sections"], start=1):
         start, end = section["range"]
         page, blocks = source_blocks(cache, body["page"], start, end)
@@ -382,20 +418,25 @@ def import_package(
             raise ValueError(
                 f"Unit {number} section {section['label']} is missing its reviewed heading"
             )
-        unit.content_blocks.append(GrammarContentBlock(
-            section="body",
-            block_type="section",
-            content_json={
-                "label": section["label"],
-                "heading": section["heading"],
-                "heading_range": section["heading_range"],
-                "source_blocks": blocks,
-                "media_ids": [media_by_key[key].id for key in section["media"]],
-            },
-            source_page=body["page"],
-            source_bbox=[0, start, page["width"], end],
-            sort_order=order,
-        ))
+        block_key = f"section:{section['label']}"
+        block = existing_blocks.pop(block_key, None)
+        if block is None:
+            block = GrammarContentBlock(unit=unit)
+            db.session.add(block)
+        block.section = "body"
+        block.block_type = "section"
+        block.content_json = {
+            "label": section["label"],
+            "heading": section["heading"],
+            "heading_range": section["heading_range"],
+            "source_blocks": blocks,
+            "media_ids": [media_by_key[key].id for key in section["media"]],
+        }
+        block.source_page = body["page"]
+        block.source_bbox = [0, start, page["width"], end]
+        block.sort_order = order
+    for stale_block in existing_blocks.values():
+        db.session.delete(stale_block)
 
     verified_at = datetime.now(timezone.utc).replace(tzinfo=None)
     answer_key_by_item = {
@@ -405,21 +446,28 @@ def import_package(
             unit_number=number,
         ).all()
     }
+    existing_exercises = {item.exercise_number: item for item in unit.exercises}
+    retired_exercises = 0
+    retired_questions = 0
+    retired_slots = 0
     for exercise_order, exercise_data in enumerate(package["exercises"], start=1):
-        exercise = GrammarExercise(
-            unit=unit,
-            exercise_number=exercise_data["number"],
-            instruction=exercise_data["instruction"],
-            exercise_type=exercise_data["type"],
-            word_bank_json={
-                "words": exercise_data["word_bank"],
-                "options": exercise_data["options"],
-                "media_ids": [media_by_key[key].id for key in exercise_data["media"]],
-            },
-            source_page=exercise_data["source_page"],
-            sort_order=exercise_order,
-        )
-        db.session.add(exercise)
+        exercise = existing_exercises.pop(exercise_data["number"], None)
+        if exercise is None:
+            exercise = GrammarExercise(unit=unit, exercise_number=exercise_data["number"])
+            db.session.add(exercise)
+        exercise.instruction = exercise_data["instruction"]
+        exercise.exercise_type = exercise_data["type"]
+        exercise.word_bank_json = {
+            "words": exercise_data["word_bank"],
+            "options": exercise_data["options"],
+            "media_ids": [media_by_key[key].id for key in exercise_data["media"]],
+        }
+        exercise.source_page = exercise_data["source_page"]
+        exercise.sort_order = exercise_order
+        exercise.is_active = True
+        db.session.flush()
+
+        existing_questions = {item.question_number: item for item in exercise.questions}
         for question_order, question_data in enumerate(exercise_data["questions"], start=1):
             answer_key = answer_key_by_item.get((
                 exercise_data["number"], question_data["number"]
@@ -429,66 +477,132 @@ def import_package(
                     f"No answer-key entry for UNIT {number} / "
                     f"{exercise_data['number']} / {question_data['number']}"
                 )
-            question = GrammarQuestion(
-                exercise=exercise,
-                question_number=question_data["number"],
-                question_type=question_data["type"],
-                content_json=question_data["content"],
-                sort_order=question_order,
-                is_example=question_data["example"],
-                source_page=question_data["source_page"],
-            )
-            db.session.add(question)
+            question = existing_questions.pop(question_data["number"], None)
+            if question is None:
+                question = GrammarQuestion(
+                    exercise=exercise, question_number=question_data["number"]
+                )
+                db.session.add(question)
+            question.question_type = question_data["type"]
+            question.content_json = question_data["content"]
+            question.sort_order = question_order
+            question.is_example = question_data["example"]
+            question.source_page = question_data["source_page"]
+            question.source_bbox = None
+            question.is_active = True
+            db.session.flush()
+
+            existing_slots = {item.slot_key: item for item in question.answer_slots}
+            for slot in existing_slots.values():
+                # Free the unique slot-order values before a possible reorder.
+                slot.slot_order = -(slot.id or 0) - 1
+            db.session.flush()
             for slot_data in question_data["slots"]:
-                question.answer_slots.append(GrammarAnswerSlot(
-                    slot_key=slot_data["key"],
-                    slot_order=slot_data["order"],
-                    answer_type=slot_data["type"],
-                    normalization_rule=slot_data["normalization"],
-                    points=slot_data["points"],
-                ))
+                slot = existing_slots.pop(slot_data["key"], None)
+                if slot is None:
+                    slot = GrammarAnswerSlot(question=question, slot_key=slot_data["key"])
+                    db.session.add(slot)
+                slot.slot_order = slot_data["order"]
+                slot.answer_type = slot_data["type"]
+                slot.normalization_rule = slot_data["normalization"]
+                slot.points = slot_data["points"]
+                slot.is_active = True
+            for stale_slot in existing_slots.values():
+                stale_slot.is_active = False
+                retired_slots += 1
+
             solution_data = question_data.get("solution")
             if solution_data is None:
                 solution_data = solution_from_answer_key(question_data, answer_key)
-            solution = GrammarSolution(
-                question=question,
-                answer_key_entry=answer_key,
-                answer_kind=solution_data["kind"],
-                display_answer=solution_data["display_answer"],
-                grading_mode=solution_data["grading_mode"],
-                is_example=question_data["example"],
-                note=solution_data.get("note"),
-                source_page=solution_data["source_page"],
-                source_label=solution_data["source_label"],
-                verification_status=solution_data["verification_status"],
-                verified_at=(
-                    verified_at if solution_data["verification_status"] == "verified" else None
-                ),
-            )
-            db.session.add(solution)
+            solution = question.solution
+            if solution is None:
+                solution = GrammarSolution(question=question)
+                db.session.add(solution)
+            solution.answer_key_entry = answer_key
+            solution.answer_kind = solution_data["kind"]
+            solution.display_answer = solution_data["display_answer"]
+            solution.grading_mode = solution_data["grading_mode"]
+            solution.is_example = question_data["example"]
+            solution.note = solution_data.get("note")
+            solution.source_page = solution_data["source_page"]
+            solution.source_label = solution_data["source_label"]
+            solution.verification_status = solution_data["verification_status"]
+            if solution_data["verification_status"] == "verified":
+                solution.verified_at = solution.verified_at or verified_at
+            else:
+                solution.verified_at = None
+            db.session.flush()
+
+            existing_variants = {item.variant_order: item for item in solution.variants}
             for variant_order, variant_data in enumerate(solution_data["variants"], start=1):
-                solution.variants.append(GrammarAnswerVariant(
-                    variant_order=variant_order,
-                    values_json=variant_data["values"],
-                    is_primary=variant_data["primary"],
-                    source_text=variant_data["source_text"],
-                ))
+                variant = existing_variants.pop(variant_order, None)
+                if variant is None:
+                    variant = GrammarAnswerVariant(
+                        solution=solution, variant_order=variant_order
+                    )
+                    db.session.add(variant)
+                variant.values_json = variant_data["values"]
+                variant.is_primary = variant_data["primary"]
+                variant.source_text = variant_data["source_text"]
+            for stale_variant in existing_variants.values():
+                db.session.delete(stale_variant)
+
+        for stale_question in existing_questions.values():
+            if stale_question.is_active:
+                retired_questions += 1
+            stale_question.is_active = False
+            for slot in stale_question.answer_slots:
+                if slot.is_active:
+                    retired_slots += 1
+                slot.is_active = False
+
+    for stale_exercise in existing_exercises.values():
+        if stale_exercise.is_active:
+            retired_exercises += 1
+        stale_exercise.is_active = False
+        for question in stale_exercise.questions:
+            if question.is_active:
+                retired_questions += 1
+            question.is_active = False
+            for slot in question.answer_slots:
+                if slot.is_active:
+                    retired_slots += 1
+                slot.is_active = False
+
+    # Media and content blocks are source assets, not user-owned records. Remove
+    # assets no longer referenced by the current package after all references
+    # have been updated to their stable media IDs.
+    for stale_media in [*existing_media.values(), *legacy_media]:
+        db.session.delete(stale_media)
 
     db.session.commit()
-    questions = [question for exercise in unit.exercises for question in exercise.questions]
+    exercises = [exercise for exercise in unit.exercises if exercise.is_active]
+    questions = [
+        question
+        for exercise in exercises
+        for question in exercise.questions
+        if question.is_active
+    ]
     return {
+        "operation": operation,
         "books": 1,
         "units": 1,
         "content_blocks": len(unit.content_blocks),
         "media": len(unit.media),
-        "exercises": len(unit.exercises),
+        "exercises": len(exercises),
         "questions": len(questions),
-        "answer_slots": sum(len(question.answer_slots) for question in questions),
+        "answer_slots": sum(
+            sum(slot.is_active for slot in question.answer_slots) for question in questions
+        ),
         "answerable_slots": sum(
-            len(question.answer_slots) for question in questions if not question.is_example
+            sum(slot.is_active for slot in question.answer_slots)
+            for question in questions if not question.is_example
         ),
         "solutions": sum(question.solution is not None for question in questions),
         "answer_variants": sum(len(question.solution.variants) for question in questions),
+        "retired_exercises": retired_exercises,
+        "retired_questions": retired_questions,
+        "retired_slots": retired_slots,
     }
 
 

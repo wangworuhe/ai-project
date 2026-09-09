@@ -15,6 +15,7 @@
 - `grammar_answer_slots`：题目中的一个或多个作答位置。
 - `grammar_answer_key_entries`：原书完整 `Key to Exercises` 答案索引；以书籍、Unit、练习号和题号作为稳定键，可先于正文和题目导入。
 - `grammar_solutions` / `grammar_answer_variants`：标准答案及可接受变体，不随阅读接口发送给前端。
+- `grammar_drafts` / `grammar_draft_answers`：按用户空间和 Unit 保存的服务器端草稿，以及每个稳定答案槽的当前输入值。答案记录同时保存题目内容哈希，便于将来识别教材更新。
 
 当前不需要单独的目录表。只有将来要支持 Part、Chapter 或自定义目录分组时，才增加 `grammar_sections`，由 Unit 关联分组。
 
@@ -40,7 +41,13 @@
 5. 自动验证区块数、题目数、答案槽、图片和来源页。
 6. 先保存为 `reviewed`，网页验收后改为 `published`；目录只返回 `published` Unit。
 
-导入应支持重复执行。使用稳定业务键（书籍版本 + Unit 编号 + 练习编号 + 题号 + 答案槽）恢复浏览器草稿，不依赖数据库自增 ID。
+导入应支持重复执行。现有 Unit 使用 `--replace` 时按稳定业务键原位更新：书籍版本 + Unit 编号、练习编号、题号、答案槽 key、媒体 asset key。不得先删除 Unit 再重建；数据包中暂时移除的练习、题目和答案槽使用 `is_active = false` 退役，以保留其数据库 ID 和未来用户作答记录。目录和阅读接口只返回 active 数据。
+
+前端以稳定业务键组织显示状态，服务器草稿记录引用稳定的答案槽 ID，并保存题目内容版本。`localStorage` 只临时保留尚未成功同步的输入，数据库保存成功后立即清除对应缓存。重复导入只修改教材内容，不应破坏用户草稿、历史作答或错题记录。
+
+当前个人 Tailnet 部署使用配置项 `GRAMMAR_DRAFT_PROFILE`（默认 `default`）作为单一用户空间，因此 Mac 与 Windows 访问同一服务时共享草稿。未来增加登录后，将该值替换为认证用户 ID 即可扩展为多用户。
+
+草稿接口为 `GET/PUT /api/grammar/library/units/<unit>/draft`。`PUT` 接收该 Unit 当前所有答案槽的快照：非空值执行 upsert，空值或本次未提交的旧值被清除。服务器只允许保存已发布、active、非示例题的答案槽。
 
 ## 当前完成度
 

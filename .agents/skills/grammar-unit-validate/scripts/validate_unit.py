@@ -122,7 +122,9 @@ def validate_database(
     require(len(blocks) == len(package["body"]["sections"]) + 1, "Content-block count differs from package")
 
     exercise_rows = connection.execute(
-        "SELECT * FROM grammar_exercises WHERE unit_id = ? ORDER BY sort_order", (unit["id"],)
+        """SELECT * FROM grammar_exercises
+           WHERE unit_id = ? AND is_active = 1 ORDER BY sort_order""",
+        (unit["id"],),
     ).fetchall()
     exercises = rows_by_key(exercise_rows, "exercise_number")
     expected_exercises = {item["number"]: item for item in package["exercises"]}
@@ -133,7 +135,7 @@ def validate_database(
         SELECT q.*, e.exercise_number
         FROM grammar_questions q
         JOIN grammar_exercises e ON e.id = q.exercise_id
-        WHERE e.unit_id = ?
+        WHERE e.unit_id = ? AND e.is_active = 1 AND q.is_active = 1
         ORDER BY e.sort_order, q.sort_order
         """,
         (unit["id"],),
@@ -157,7 +159,8 @@ def validate_database(
         require(json.loads(question["content_json"]) == expected["content"], f"Question content differs: {key}")
 
         slot_rows = connection.execute(
-            "SELECT * FROM grammar_answer_slots WHERE question_id = ? ORDER BY slot_order",
+            """SELECT * FROM grammar_answer_slots
+               WHERE question_id = ? AND is_active = 1 ORDER BY slot_order""",
             (question["id"],),
         ).fetchall()
         expected_slots = expected["slots"]
@@ -194,12 +197,72 @@ def validate_database(
         "SELECT * FROM grammar_media WHERE unit_id = ?", (unit["id"],)
     ).fetchall()
     require(len(media_rows) == len(package["media"]), "Media count differs from package")
+    require(
+        {media["asset_key"] for media in media_rows} == set(package["media"]),
+        "Media asset keys differ from package",
+    )
     for media in media_rows:
         require(bool(media["content_blob"]), f"Media {media['id']} has an empty blob")
         require(
             hashlib.sha256(media["content_blob"]).hexdigest() == media["sha256"],
             f"Media {media['id']} SHA256 differs",
         )
+
+    retired_exercises = connection.execute(
+        "SELECT COUNT(*) FROM grammar_exercises WHERE unit_id = ? AND is_active = 0",
+        (unit["id"],),
+    ).fetchone()[0]
+    retired_questions = connection.execute(
+        """SELECT COUNT(*) FROM grammar_questions q
+           JOIN grammar_exercises e ON e.id = q.exercise_id
+           WHERE e.unit_id = ? AND q.is_active = 0""",
+        (unit["id"],),
+    ).fetchone()[0]
+    retired_slots = connection.execute(
+        """SELECT COUNT(*) FROM grammar_answer_slots s
+           JOIN grammar_questions q ON q.id = s.question_id
+           JOIN grammar_exercises e ON e.id = q.exercise_id
+           WHERE e.unit_id = ? AND s.is_active = 0""",
+        (unit["id"],),
+    ).fetchone()[0]
+
+    identity = {
+        "unit": unit["id"],
+        "content_blocks": {
+            (
+                "heading" if block["block_type"] == "heading"
+                else f"section:{json.loads(block['content_json']).get('label')}"
+            ): block["id"]
+            for block in blocks
+        },
+        "media": {media["asset_key"]: media["id"] for media in media_rows},
+        "exercises": {
+            exercise["exercise_number"]: exercise["id"] for exercise in exercise_rows
+        },
+        "questions": {
+            f"{question['exercise_number']}:{question['question_number']}": question["id"]
+            for question in question_rows
+        },
+        "slots": {
+            f"{key[0]}:{key[1]}:{slot['slot_key']}": slot["id"]
+            for key, question in questions.items()
+            for slot in connection.execute(
+                """SELECT * FROM grammar_answer_slots
+                   WHERE question_id = ? AND is_active = 1 ORDER BY slot_order""",
+                (question["id"],),
+            ).fetchall()
+        },
+        "solutions": {
+            f"{key[0]}:{key[1]}": connection.execute(
+                "SELECT id FROM grammar_solutions WHERE question_id = ?",
+                (question["id"],),
+            ).fetchone()[0]
+            for key, question in questions.items()
+        },
+    }
+    identity_sha256 = hashlib.sha256(
+        json.dumps(identity, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    ).hexdigest()
 
     return {
         "status": unit["status"],
@@ -210,6 +273,10 @@ def validate_database(
         "answer_slots": expected_slot_count,
         "non_example_questions": non_example_count,
         "linked_answers": linked_answer_count,
+        "retired_exercises": retired_exercises,
+        "retired_questions": retired_questions,
+        "retired_slots": retired_slots,
+        "identity_sha256": identity_sha256,
     }
 
 

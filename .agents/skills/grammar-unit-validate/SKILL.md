@@ -37,7 +37,9 @@ Run from the project root:
 .venv/bin/python .agents/skills/grammar-unit-validate/scripts/validate_unit.py --unit N
 ```
 
-For a published Unit, add `--require-status published`. The command must report `PASS`. It checks schema validation, source-cache assets, package/database counts, exact question content and slots, media hashes, solutions, answer-key foreign keys, SQLite integrity, and foreign keys.
+For a published Unit, add `--require-status published`. The command must report `PASS`. It checks schema validation, source-cache assets, package/database counts, exact question content and slots, media asset keys and hashes, solutions, answer-key foreign keys, SQLite integrity, and foreign keys. It also returns an `identity_sha256` fingerprint of stable Unit, content-block, media, exercise, question, answer-slot, and solution IDs.
+
+When validating a reimport, compare `identity_sha256` before and after. Content corrections may change text and timestamps, but must not change the IDs represented by that fingerprint.
 
 Then run:
 

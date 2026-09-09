@@ -127,17 +127,27 @@ def get_published_unit(unit_number):
         })
 
     exercises = []
-    for exercise in sorted(unit.exercises, key=lambda item: item.sort_order):
+    for exercise in sorted(
+        (item for item in unit.exercises if item.is_active),
+        key=lambda item: item.sort_order,
+    ):
         metadata = exercise.word_bank_json or {}
         exercise_media = [
             media_id for media_id in metadata.get("media_ids", [])
             if media_id in media_by_id
         ]
         questions = []
-        for question in sorted(exercise.questions, key=lambda item: item.sort_order):
+        for question in sorted(
+            (item for item in exercise.questions if item.is_active),
+            key=lambda item: item.sort_order,
+        ):
             slots = []
-            for slot in sorted(question.answer_slots, key=lambda item: item.slot_order):
+            for slot in sorted(
+                (item for item in question.answer_slots if item.is_active),
+                key=lambda item: item.slot_order,
+            ):
                 slots.append({
+                    "id": slot.id,
                     "key": slot.slot_key,
                     "answer_key": (
                         f"u{unit.unit_number}-{exercise.exercise_number}-"

@@ -5,7 +5,7 @@
         <h1>English Grammar in Use</h1>
         <p>第五版 · 已导入 {{ catalog?.units.length || 0 }} 个 Unit · 原书阅读与练习</p>
       </div>
-      <p class="save-note">练习答案仅保存到此浏览器</p>
+      <p class="save-note">练习答案自动保存到数据库</p>
     </header>
 
     <div v-if="catalog && selectedUnit" class="reader-layout" :class="{ 'toc-is-collapsed': !isTocOpen }">
@@ -113,7 +113,7 @@
                 <p>Exercises</p>
                 <div>
                   <span>{{ answeredCount }} / {{ answerableCount }} 已填写</span>
-                  <span>{{ draftStatus }}</span>
+                  <span v-if="draftError" class="draft-error" role="alert">{{ draftError }}</span>
                   <button type="button" @click="showOriginalPage = !showOriginalPage">
                     {{ showOriginalPage ? '收起原页' : '查看原页' }}
                   </button>
@@ -167,7 +167,9 @@
                         v-model="answers[answerKey(question)]"
                         class="matching-select"
                         data-answer-field
-                        @change="saveDraft"
+                        @change="flushDraftSave"
+                        @blur="flushDraftSave"
+                        @mouseleave="flushDraftSave"
                       >
                         <option value="">选择</option>
                         <option v-for="option in exercise.options" :key="option.id" :value="option.id">
@@ -188,7 +190,9 @@
                         :aria-label="`第 ${question.number} 题答案`"
                         autocomplete="off"
                         spellcheck="false"
-                        @input="saveDraft"
+                        @input="scheduleDraftSave"
+                        @blur="flushDraftSave"
+                        @mouseleave="flushDraftSave"
                         @keydown.enter.prevent="focusAdjacentAnswer($event)"
                       >
                     </template>
@@ -205,7 +209,9 @@
                             :aria-label="answerLabel(question, segment.slot_key)"
                             autocomplete="off"
                             spellcheck="false"
-                            @input="saveDraft"
+                            @input="scheduleDraftSave"
+                            @blur="flushDraftSave"
+                            @mouseleave="flushDraftSave"
                             @keydown.enter.prevent="focusAdjacentAnswer($event)"
                           >
                           <span v-else-if="segment.type === 'cue'" class="answer-cue">({{ segment.text }})</span>
@@ -241,7 +247,7 @@
 </template>
 
 <script setup>
-import { computed, nextTick, onMounted, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import api from '@/api'
 
@@ -251,11 +257,16 @@ const catalog = ref(null)
 const structuredUnit = ref(null)
 const structuredLoading = ref(false)
 const answers = ref({})
-const draftStatus = ref('')
+const draftError = ref('')
 const loadError = ref('')
 const isTocOpen = ref(true)
 const showOriginalPage = ref(false)
 let structuredRequest = 0
+let draftSaveTimer = null
+let draftSaveQueue = Promise.resolve()
+const lastPersistedDraft = new Map()
+const queuedDraft = new Map()
+const DRAFT_SAVE_DELAY = 2000
 
 const EXERCISE_RENDERERS = Object.freeze({
   fill: 'inline',
@@ -271,9 +282,6 @@ const selectedUnit = computed(() => {
 })
 
 const activeSection = computed(() => route.query.section === 'exercise' ? 'exercise' : 'reading')
-const draftKey = computed(() => selectedUnit.value
-  ? `${catalog.value.book.edition}-unit-${selectedUnit.value.number}-page-${selectedUnit.value.exercise_page}`
-  : '')
 const answerableSlots = computed(() => (
   structuredUnit.value?.exercises.flatMap(exercise => (
     exercise.questions.flatMap(question => (
@@ -301,33 +309,114 @@ const answerLabel = (question, slotKey) => {
     : `第 ${question.number} 题答案`
 }
 
-const loadDraft = () => {
-  if (!draftKey.value) return
+const draftKeyFor = unit => (
+  `${catalog.value.book.edition}-unit-${unit.number}-page-${unit.exercise_page}`
+)
+
+const readLocalDraft = key => {
   try {
-    answers.value = JSON.parse(localStorage.getItem(draftKey.value) || '{}')
-    const hasAnswer = Object.values(answers.value).some(value => (
-      typeof value === 'string' && value.trim().length > 0
-    ))
-    draftStatus.value = hasAnswer ? '本机草稿已加载' : '可以开始作答'
+    return JSON.parse(localStorage.getItem(key) || '{}')
   } catch {
-    answers.value = {}
-    draftStatus.value = '可以开始作答'
+    return {}
   }
 }
 
-const saveDraft = () => {
+const writeLocalDraft = (key, values) => {
   const nonEmptyAnswers = Object.fromEntries(
-    Object.entries(answers.value).filter(([, value]) => (
+    Object.entries(values).filter(([, value]) => (
       typeof value === 'string' && value.trim().length > 0
     ))
   )
-  if (Object.keys(nonEmptyAnswers).length) {
-    localStorage.setItem(draftKey.value, JSON.stringify(nonEmptyAnswers))
-    draftStatus.value = '已保存到此浏览器'
-  } else {
-    localStorage.removeItem(draftKey.value)
-    draftStatus.value = '可以开始作答'
+  try {
+    if (Object.keys(nonEmptyAnswers).length) {
+      localStorage.setItem(key, JSON.stringify(nonEmptyAnswers))
+    } else {
+      localStorage.removeItem(key)
+    }
+  } catch {
+    // Database persistence remains available when browser storage is disabled.
   }
+  return nonEmptyAnswers
+}
+
+const buildDraftContext = (unit, values) => {
+  if (!unit || !catalog.value?.book) return null
+  const rows = unit.exercises.flatMap(exercise => (
+    exercise.questions.flatMap(question => (
+      question.is_example
+        ? []
+        : question.slots.map(slot => ({
+            slot_id: slot.id,
+            value: typeof values[slot.answer_key] === 'string' ? values[slot.answer_key] : ''
+          }))
+    ))
+  ))
+  return {
+    unitNumber: unit.number,
+    localKey: draftKeyFor(unit),
+    localValues: { ...values },
+    answers: rows,
+    fingerprint: JSON.stringify(rows)
+  }
+}
+
+const saveFailureMessage = error => {
+  const reason = error.response?.data?.message
+  if (reason) return `答案保存失败：${reason}`
+  if (!error.response) return '答案保存失败：无法连接服务器，答案仍保留在本机。'
+  return `答案保存失败：服务器返回 ${error.response.status}。`
+}
+
+const queueDraftSave = context => {
+  if (!context) return draftSaveQueue
+  const cachedValues = writeLocalDraft(context.localKey, context.localValues)
+  const pendingFingerprint = queuedDraft.get(context.unitNumber)
+  if (pendingFingerprint === context.fingerprint) return draftSaveQueue
+  if (
+    pendingFingerprint === undefined &&
+    lastPersistedDraft.get(context.unitNumber) === context.fingerprint
+  ) return draftSaveQueue
+
+  queuedDraft.set(context.unitNumber, context.fingerprint)
+  draftSaveQueue = draftSaveQueue.then(async () => {
+    try {
+      await api.put(`/grammar/library/units/${context.unitNumber}/draft`, {
+        answers: context.answers
+      }, { timeout: 10000 })
+      lastPersistedDraft.set(context.unitNumber, context.fingerprint)
+      if (JSON.stringify(readLocalDraft(context.localKey)) === JSON.stringify(cachedValues)) {
+        try {
+          localStorage.removeItem(context.localKey)
+        } catch {
+          // The server save succeeded; a browser-cache cleanup failure is harmless.
+        }
+      }
+      if (structuredUnit.value?.number === context.unitNumber) draftError.value = ''
+    } catch (error) {
+      if (structuredUnit.value?.number === context.unitNumber) {
+        draftError.value = saveFailureMessage(error)
+      }
+    } finally {
+      if (queuedDraft.get(context.unitNumber) === context.fingerprint) {
+        queuedDraft.delete(context.unitNumber)
+      }
+    }
+  })
+  return draftSaveQueue
+}
+
+const scheduleDraftSave = () => {
+  const context = buildDraftContext(structuredUnit.value, { ...answers.value })
+  if (!context) return
+  writeLocalDraft(context.localKey, answers.value)
+  window.clearTimeout(draftSaveTimer)
+  draftSaveTimer = window.setTimeout(() => queueDraftSave(context), DRAFT_SAVE_DELAY)
+}
+
+const flushDraftSave = () => {
+  window.clearTimeout(draftSaveTimer)
+  draftSaveTimer = null
+  return queueDraftSave(buildDraftContext(structuredUnit.value, { ...answers.value }))
 }
 
 const loadStructuredUnit = async number => {
@@ -335,9 +424,39 @@ const loadStructuredUnit = async number => {
   structuredUnit.value = null
   structuredLoading.value = true
   loadError.value = ''
+  draftError.value = ''
   try {
     const { data } = await api.get(`/grammar/library/units/${number}`)
-    if (request === structuredRequest) structuredUnit.value = data.data
+    if (request !== structuredRequest) return
+    const unit = data.data
+    const localKey = draftKeyFor(unit)
+    const localAnswers = readLocalDraft(localKey)
+    let serverAnswers = {}
+    try {
+      const draftResponse = await api.get(
+        `/grammar/library/units/${number}/draft`, { timeout: 10000 }
+      )
+      const answerKeyBySlotId = new Map(
+        unit.exercises.flatMap(exercise => exercise.questions).flatMap(question => question.slots)
+          .map(slot => [slot.id, slot.answer_key])
+      )
+      serverAnswers = Object.fromEntries(
+        draftResponse.data.data.answers
+          .filter(item => answerKeyBySlotId.has(item.slot_id))
+          .map(item => [answerKeyBySlotId.get(item.slot_id), item.value])
+      )
+    } catch (error) {
+      draftError.value = saveFailureMessage(error).replace('保存失败', '读取失败')
+    }
+    if (request !== structuredRequest) return
+    structuredUnit.value = unit
+    const serverContext = buildDraftContext(unit, serverAnswers)
+    lastPersistedDraft.set(number, serverContext.fingerprint)
+    answers.value = { ...serverAnswers, ...localAnswers }
+    const mergedContext = buildDraftContext(unit, answers.value)
+    if (mergedContext.fingerprint !== serverContext.fingerprint) {
+      queueDraftSave(mergedContext)
+    }
   } catch (error) {
     if (request === structuredRequest) {
       loadError.value = error.response?.data?.message || '无法读取结构化书籍内容。'
@@ -348,10 +467,12 @@ const loadStructuredUnit = async number => {
 }
 
 const selectUnit = number => {
+  flushDraftSave()
   router.replace({ query: { unit: String(number) } })
 }
 
 const selectSection = section => {
+  if (activeSection.value === 'exercise') flushDraftSave()
   const query = { unit: String(selectedUnit.value.number) }
   if (section === 'exercise') query.section = 'exercise'
   router.replace({ query })
@@ -368,7 +489,6 @@ const focusAdjacentAnswer = async event => {
 watch(selectedUnit, unit => {
   if (!unit) return
   showOriginalPage.value = false
-  loadDraft()
   loadStructuredUnit(unit.number)
 })
 
@@ -389,6 +509,10 @@ onMounted(async () => {
   } catch (error) {
     loadError.value = error.response?.data?.message || '无法读取数据库书籍目录。'
   }
+})
+
+onBeforeUnmount(() => {
+  flushDraftSave()
 })
 </script>
 
@@ -441,6 +565,7 @@ onMounted(async () => {
 .lesson-media { margin: 24px 0 2px; }
 .lesson-media img { display: block; max-width: min(100%, 580px); height: auto; }
 .exercise-status > div { display: flex; align-items: center; gap: 14px; color: #3e756e; font-size: .75rem; }
+.draft-error { max-width: 520px; color: #a23f34; font-weight: 650; }
 .exercise-workbook { font-size: 1.04rem; }
 .exercise-block { padding: 36px clamp(24px, 5vw, 64px) 42px; border-bottom: 1px solid #cad8dd; }
 .exercise-block:last-of-type { border-bottom: 0; }

@@ -19,6 +19,11 @@ GRAMMAR_BOOK_PAGES_DIR = GRAMMAR_DIR / "book-pages"
 # variables take precedence, which keeps deployment configuration unchanged.
 load_dotenv(PROJECT_ROOT / ".env")
 
+DATABASE_PATH = Path(
+    os.environ.get("AI_PROJECT_DATABASE_PATH", DATABASE_DIR / "database.db")
+).expanduser().resolve()
+DATABASE_PATH.parent.mkdir(parents=True, exist_ok=True)
+
 for directory in (
     DATABASE_DIR, LOG_DIR, UPLOAD_DIR, OUTPUT_DIR, AZURE_OUTPUT_DIR,
     GOOGLE_OUTPUT_DIR, GRAMMAR_DIR, GRAMMAR_EXPORT_DIR, GRAMMAR_BOOK_PAGES_DIR,
@@ -28,7 +33,7 @@ for directory in (
 class Config:
     PROJECT_ROOT = str(PROJECT_ROOT)
     STORAGE_DIR = str(STORAGE_DIR)
-    DATABASE_PATH = str(DATABASE_DIR / "database.db")
+    DATABASE_PATH = str(DATABASE_PATH)
     LOG_FILE = str(LOG_DIR / "app.log")
     UPLOAD_DIR = str(UPLOAD_DIR)
     OUTPUT_DIR = str(OUTPUT_DIR)
@@ -41,4 +46,5 @@ class Config:
     SECRET_KEY = os.environ.get("SECRET_KEY") or "you-will-never-guess"
     SQLALCHEMY_DATABASE_URI = f"sqlite:///{DATABASE_PATH}"
     SQLALCHEMY_TRACK_MODIFICATIONS = False
+    GRAMMAR_DRAFT_PROFILE = os.environ.get("GRAMMAR_DRAFT_PROFILE", "default")
     LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO")  # 通过环境变量覆盖
