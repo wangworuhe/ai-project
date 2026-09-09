@@ -18,6 +18,7 @@ from backend.models.grammar import (
     GrammarExercise,
     GrammarMedia,
     GrammarMistake,
+    GrammarMistakeEntry,
     GrammarQuestion,
     GrammarSolution,
     GrammarUnit,
@@ -75,3 +76,8 @@ def init_db(app):
                 f"ON {table_name}(is_active)"
             ))
         db.session.commit()
+
+        # Existing formal submissions predate the mistake book. Replaying them is
+        # idempotent because each entry remembers the latest applied attempt answer.
+        from backend.services.grammar_mistake_service import sync_existing_attempts
+        sync_existing_attempts()

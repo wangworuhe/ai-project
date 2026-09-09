@@ -515,6 +515,54 @@ class GrammarAttemptAnswer(db.Model):
     solution = db.relationship("GrammarSolution")
 
 
+class GrammarMistakeEntry(db.Model):
+    """Current mistake-book state derived from immutable attempt answers."""
+
+    __tablename__ = "grammar_mistake_entries"
+    __table_args__ = (
+        db.UniqueConstraint(
+            "profile_key", "question_id", name="uq_grammar_mistake_profile_question"
+        ),
+    )
+
+    id = db.Column(db.Integer, primary_key=True)
+    profile_key = db.Column(db.String(64), nullable=False, index=True)
+    question_id = db.Column(
+        db.Integer,
+        db.ForeignKey("grammar_questions.id", ondelete="RESTRICT"),
+        nullable=False,
+        index=True,
+    )
+    latest_attempt_answer_id = db.Column(
+        db.Integer,
+        db.ForeignKey("grammar_attempt_answers.id", ondelete="RESTRICT"),
+        nullable=False,
+        index=True,
+    )
+    latest_incorrect_attempt_answer_id = db.Column(
+        db.Integer,
+        db.ForeignKey("grammar_attempt_answers.id", ondelete="RESTRICT"),
+        nullable=False,
+        index=True,
+    )
+    status = db.Column(db.String(24), nullable=False, default="reviewing", index=True)
+    wrong_count = db.Column(db.Integer, nullable=False, default=1)
+    correct_streak = db.Column(db.Integer, nullable=False, default=0)
+    first_wrong_at = db.Column(db.DateTime, nullable=False)
+    last_wrong_at = db.Column(db.DateTime, nullable=False, index=True)
+    last_practiced_at = db.Column(db.DateTime, nullable=False)
+    mastered_at = db.Column(db.DateTime, nullable=True)
+    created_at = db.Column(db.DateTime, nullable=False, default=db.func.current_timestamp())
+    updated_at = db.Column(
+        db.DateTime,
+        nullable=False,
+        default=db.func.current_timestamp(),
+        onupdate=db.func.current_timestamp(),
+    )
+
+    question = db.relationship("GrammarQuestion")
+
+
 class GrammarAttempt(db.Model):
     __tablename__ = "grammar_attempts"
 

@@ -53,9 +53,24 @@
             :disabled="submitting"
             @click="selectSection('exercise')"
           >练习</button>
+          <button
+            type="button"
+            role="tab"
+            :class="{ active: activeSection === 'mistakes' }"
+            :aria-selected="activeSection === 'mistakes'"
+            :disabled="submitting"
+            @click="selectSection('mistakes')"
+          >错题本</button>
         </nav>
 
-        <div class="spread-heading">
+        <div v-if="activeSection === 'mistakes'" class="spread-heading">
+          <div>
+            <p>Review</p>
+            <h2>错题本</h2>
+          </div>
+          <span>根据正式提交记录自动更新</span>
+        </div>
+        <div v-else class="spread-heading">
           <div>
             <p>Unit {{ selectedUnit.number }}</p>
             <h2>{{ selectedUnit.title }}</h2>
@@ -64,7 +79,12 @@
         </div>
 
         <div class="pages" aria-live="polite">
-          <div v-if="structuredLoading" class="book-state inline-state">正在读取结构化内容…</div>
+          <GrammarMistakeBook
+            v-if="activeSection === 'mistakes'"
+            :refresh-key="mistakeRevision"
+            @review="reviewMistake"
+          />
+          <div v-else-if="structuredLoading" class="book-state inline-state">正在读取结构化内容…</div>
 
           <template v-else-if="structuredUnit">
             <article v-if="activeSection === 'reading'" class="structured-page" role="tabpanel">
@@ -180,8 +200,10 @@
                     v-for="question in exercise.questions"
                     :key="question.id"
                     :value="Number(question.number)"
+                    :data-question-id="question.id"
                     :class="[
                       { example: question.is_example },
+                      { targeted: Number(route.query.question) === question.id },
                       resultFor(question.id)?.outcome
                         ? `result-${resultFor(question.id).outcome}`
                         : ''
@@ -309,6 +331,7 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import api from '@/api'
+import GrammarMistakeBook from '@/components/GrammarMistakeBook.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -323,6 +346,7 @@ const submitError = ref('')
 const loadError = ref('')
 const isTocOpen = ref(true)
 const showOriginalPage = ref(false)
+const mistakeRevision = ref(0)
 let structuredRequest = 0
 let draftSaveTimer = null
 let draftSaveQueue = Promise.resolve()
@@ -343,7 +367,9 @@ const selectedUnit = computed(() => {
   return catalog.value.units.find(unit => unit.number === requested) || catalog.value.units[0]
 })
 
-const activeSection = computed(() => route.query.section === 'exercise' ? 'exercise' : 'reading')
+const activeSection = computed(() => (
+  ['exercise', 'mistakes'].includes(route.query.section) ? route.query.section : 'reading'
+))
 const answerableSlots = computed(() => (
   structuredUnit.value?.exercises.flatMap(exercise => (
     exercise.questions.flatMap(question => (
@@ -555,6 +581,13 @@ const loadStructuredUnit = async number => {
     if (mergedContext.fingerprint !== serverContext.fingerprint) {
       queueDraftSave(mergedContext)
     }
+    const targetQuestion = Number(route.query.question)
+    if (Number.isInteger(targetQuestion) && targetQuestion > 0) {
+      await nextTick()
+      document.querySelector(`[data-question-id="${targetQuestion}"]`)?.scrollIntoView({
+        behavior: 'smooth', block: 'center'
+      })
+    }
   } catch (error) {
     if (request === structuredRequest) {
       loadError.value = error.response?.data?.message || '无法读取结构化书籍内容。'
@@ -588,6 +621,7 @@ const submitAnswers = async () => {
       return
     }
     submission.value = data.data
+    mistakeRevision.value += 1
   } catch (error) {
     submitError.value = error.response?.data?.message || '提交判题失败，请稍后重试。'
   } finally {
@@ -598,15 +632,28 @@ const submitAnswers = async () => {
 const selectUnit = number => {
   if (submitting.value) return
   flushDraftSave()
-  router.replace({ query: { unit: String(number) } })
+  const query = { unit: String(number) }
+  if (activeSection.value !== 'reading') query.section = activeSection.value
+  router.replace({ query })
 }
 
 const selectSection = section => {
   if (submitting.value) return
   if (activeSection.value === 'exercise') flushDraftSave()
   const query = { unit: String(selectedUnit.value.number) }
-  if (section === 'exercise') query.section = 'exercise'
+  if (section !== 'reading') query.section = section
   router.replace({ query })
+}
+
+const reviewMistake = item => {
+  if (submitting.value) return
+  router.replace({
+    query: {
+      unit: String(item.unit_number),
+      section: 'exercise',
+      question: String(item.question_id)
+    }
+  })
 }
 
 const focusAdjacentAnswer = async event => {
@@ -720,6 +767,7 @@ onBeforeUnmount(() => {
 .question-list > li { padding: 5px 8px; font-size: 1.06rem; line-height: 1.62; }
 .question-list > li::marker { color: #4abfae; font-weight: 700; }
 .question-list > li:focus-within { box-shadow: inset 3px 0 0 rgba(88, 199, 183, .65); }
+.question-list > li.targeted { outline: 3px solid rgba(229, 148, 65, .75); outline-offset: 5px; }
 .question-list > li.result-correct { background: #f2faf6; }
 .question-list > li.result-incorrect,.question-list > li.result-incomplete { background: #fff5f2; }
 .question-list > li.result-unanswered,.question-list > li.result-needs_review { background: #fff9e9; }

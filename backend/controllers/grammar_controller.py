@@ -18,6 +18,7 @@ from backend.services.grammar_grading_service import (
     get_attempt_session,
     submit_unit_attempt,
 )
+from backend.services.grammar_mistake_service import MistakeQueryError, list_mistakes
 
 
 def get_book_page(page_number):
@@ -104,4 +105,16 @@ def get_library_submission(session_id):
     result = get_attempt_session(session_id)
     if result is None:
         return jsonify({"status": "error", "message": "未找到该次提交记录"}), 404
+    return jsonify({"status": "success", "data": result})
+
+
+def get_library_mistakes():
+    scope = request.args.get("status", "active")
+    raw_unit = request.args.get("unit")
+    try:
+        unit_number = int(raw_unit) if raw_unit is not None else None
+        result = list_mistakes(scope=scope, unit_number=unit_number)
+    except (ValueError, MistakeQueryError) as error:
+        message = str(error) if isinstance(error, MistakeQueryError) else "unit 必须是正整数"
+        return jsonify({"status": "error", "message": message}), 400
     return jsonify({"status": "success", "data": result})

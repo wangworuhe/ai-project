@@ -20,6 +20,7 @@ from backend.models.grammar import (
     GrammarQuestion,
     GrammarUnit,
 )
+from backend.services.grammar_mistake_service import apply_attempt_answer
 
 
 GRADING_VERSION = "deterministic-v1"
@@ -403,6 +404,8 @@ def submit_unit_attempt(unit_number, payload):
             points_possible=possible,
         )
         db.session.add(record)
+        db.session.flush()
+        apply_attempt_answer(record, session.profile_key, practiced_at=submitted_at)
         results.append({
             "question_id": question.id,
             "exercise_number": exercise.exercise_number,
