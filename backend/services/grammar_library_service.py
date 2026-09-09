@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from backend.extensions import db
 from backend.models.grammar import GrammarMedia, GrammarUnit
+from backend.services.grammar_grading_service import question_submission_version
 
 
 def _merge_segments(segments):
@@ -158,6 +159,7 @@ def get_published_unit(unit_number):
                 })
             serialized = {
                 "id": question.id,
+                "submission_version": question_submission_version(question),
                 "number": question.question_number,
                 "type": question.question_type,
                 "is_example": question.is_example,

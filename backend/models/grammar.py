@@ -431,6 +431,90 @@ class GrammarDraftAnswer(db.Model):
     answer_slot = db.relationship("GrammarAnswerSlot")
 
 
+class GrammarAttemptSession(db.Model):
+    """One immutable submission of every answer in a published Unit."""
+
+    __tablename__ = "grammar_attempt_sessions"
+
+    id = db.Column(db.Integer, primary_key=True)
+    profile_key = db.Column(db.String(64), nullable=False, index=True)
+    unit_id = db.Column(
+        db.Integer,
+        db.ForeignKey("grammar_units.id", ondelete="RESTRICT"),
+        nullable=False,
+        index=True,
+    )
+    status = db.Column(db.String(24), nullable=False, index=True)
+    grading_version = db.Column(db.String(32), nullable=False)
+    total_questions = db.Column(db.Integer, nullable=False)
+    correct_count = db.Column(db.Integer, nullable=False)
+    incorrect_count = db.Column(db.Integer, nullable=False)
+    incomplete_count = db.Column(db.Integer, nullable=False)
+    unanswered_count = db.Column(db.Integer, nullable=False)
+    needs_review_count = db.Column(db.Integer, nullable=False)
+    points_awarded = db.Column(db.Numeric(8, 2), nullable=False)
+    points_possible = db.Column(db.Numeric(8, 2), nullable=False)
+    submitted_at = db.Column(db.DateTime, nullable=False)
+    created_at = db.Column(db.DateTime, nullable=False, default=db.func.current_timestamp())
+
+    unit = db.relationship("GrammarUnit")
+    answers = db.relationship(
+        "GrammarAttemptAnswer",
+        back_populates="session",
+        cascade="all, delete-orphan",
+        order_by="GrammarAttemptAnswer.id",
+    )
+
+
+class GrammarAttemptAnswer(db.Model):
+    """Immutable grading evidence for one question in an attempt session."""
+
+    __tablename__ = "grammar_attempt_answers"
+    __table_args__ = (
+        db.UniqueConstraint(
+            "session_id", "question_id", name="uq_grammar_attempt_session_question"
+        ),
+    )
+
+    id = db.Column(db.Integer, primary_key=True)
+    session_id = db.Column(
+        db.Integer,
+        db.ForeignKey("grammar_attempt_sessions.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    question_id = db.Column(
+        db.Integer,
+        db.ForeignKey("grammar_questions.id", ondelete="RESTRICT"),
+        nullable=False,
+        index=True,
+    )
+    solution_id = db.Column(
+        db.Integer,
+        db.ForeignKey("grammar_solutions.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+    exercise_number = db.Column(db.String(24), nullable=False)
+    question_number = db.Column(db.String(24), nullable=False)
+    question_content_json = db.Column(db.JSON, nullable=False)
+    question_content_sha256 = db.Column(db.String(64), nullable=False)
+    solution_snapshot_json = db.Column(db.JSON, nullable=True)
+    solution_sha256 = db.Column(db.String(64), nullable=True)
+    user_answers_json = db.Column(db.JSON, nullable=False)
+    normalized_answers_json = db.Column(db.JSON, nullable=False)
+    outcome = db.Column(db.String(24), nullable=False, index=True)
+    grading_mode = db.Column(db.String(24), nullable=True)
+    matched_variant_order = db.Column(db.Integer, nullable=True)
+    points_awarded = db.Column(db.Numeric(8, 2), nullable=False)
+    points_possible = db.Column(db.Numeric(8, 2), nullable=False)
+    created_at = db.Column(db.DateTime, nullable=False, default=db.func.current_timestamp())
+
+    session = db.relationship("GrammarAttemptSession", back_populates="answers")
+    question = db.relationship("GrammarQuestion")
+    solution = db.relationship("GrammarSolution")
+
+
 class GrammarAttempt(db.Model):
     __tablename__ = "grammar_attempts"
 

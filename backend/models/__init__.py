@@ -9,6 +9,8 @@ from backend.models.grammar import (
     GrammarAnswerKeyEntry,
     GrammarAnswerVariant,
     GrammarAttempt,
+    GrammarAttemptAnswer,
+    GrammarAttemptSession,
     GrammarBook,
     GrammarContentBlock,
     GrammarDraft,

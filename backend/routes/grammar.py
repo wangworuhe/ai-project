@@ -3,9 +3,11 @@ from flask import Blueprint
 from backend.controllers.grammar_controller import (
     get_book_page,
     get_library_media,
+    get_library_submission,
     get_library_unit,
     get_library_unit_draft,
     get_library_units,
+    post_library_unit_submission,
     put_library_unit_draft,
 )
 
@@ -16,4 +18,8 @@ grammar_bp.get("/library/units")(get_library_units)
 grammar_bp.get("/library/units/<int:unit_number>")(get_library_unit)
 grammar_bp.get("/library/units/<int:unit_number>/draft")(get_library_unit_draft)
 grammar_bp.put("/library/units/<int:unit_number>/draft")(put_library_unit_draft)
+grammar_bp.post("/library/units/<int:unit_number>/submissions")(
+    post_library_unit_submission
+)
+grammar_bp.get("/library/submissions/<int:session_id>")(get_library_submission)
 grammar_bp.get("/library/media/<int:media_id>")(get_library_media)

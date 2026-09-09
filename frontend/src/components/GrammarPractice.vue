@@ -26,6 +26,7 @@
             :key="unit.number"
             :class="{ selected: selectedUnit?.number === unit.number }"
             :aria-current="selectedUnit?.number === unit.number ? 'page' : undefined"
+            :disabled="submitting"
             @click="selectUnit(unit.number)"
           >
             <span>Unit {{ unit.number }}</span>
@@ -41,6 +42,7 @@
             role="tab"
             :class="{ active: activeSection === 'reading' }"
             :aria-selected="activeSection === 'reading'"
+            :disabled="submitting"
             @click="selectSection('reading')"
           >正文</button>
           <button
@@ -48,6 +50,7 @@
             role="tab"
             :class="{ active: activeSection === 'exercise' }"
             :aria-selected="activeSection === 'exercise'"
+            :disabled="submitting"
             @click="selectSection('exercise')"
           >练习</button>
         </nav>
@@ -114,10 +117,37 @@
                 <div>
                   <span>{{ answeredCount }} / {{ answerableCount }} 已填写</span>
                   <span v-if="draftError" class="draft-error" role="alert">{{ draftError }}</span>
+                  <button
+                    type="button"
+                    class="submit-answers"
+                    :disabled="submitting || !answerableCount"
+                    @click="submitAnswers"
+                  >{{ submitting ? '正在判题…' : '提交并判题' }}</button>
                   <button type="button" @click="showOriginalPage = !showOriginalPage">
                     {{ showOriginalPage ? '收起原页' : '查看原页' }}
                   </button>
                 </div>
+              </div>
+
+              <div v-if="submitError" class="submission-error" role="alert">
+                {{ submitError }}
+              </div>
+              <div v-if="submission" class="submission-summary" aria-live="polite">
+                <strong>
+                  得分 {{ submission.summary.points_awarded }} / {{ submission.summary.points_possible }}
+                </strong>
+                <span>正确 {{ submission.summary.correct }}</span>
+                <span>错误 {{ submission.summary.incorrect }}</span>
+                <span v-if="submission.summary.incomplete">
+                  未答完整 {{ submission.summary.incomplete }}
+                </span>
+                <span v-if="submission.summary.unanswered">
+                  未作答 {{ submission.summary.unanswered }}
+                </span>
+                <span v-if="submission.summary.needs_review">
+                  待审核 {{ submission.summary.needs_review }}
+                </span>
+                <small>提交记录 #{{ submission.id }}</small>
               </div>
 
               <section
@@ -150,7 +180,12 @@
                     v-for="question in exercise.questions"
                     :key="question.id"
                     :value="Number(question.number)"
-                    :class="{ example: question.is_example }"
+                    :class="[
+                      { example: question.is_example },
+                      resultFor(question.id)?.outcome
+                        ? `result-${resultFor(question.id).outcome}`
+                        : ''
+                    ]"
                   >
                     <template v-if="question.is_example">
                       <p class="question-prompt">{{ question.content.prompt }}</p>
@@ -167,7 +202,8 @@
                         v-model="answers[answerKey(question)]"
                         class="matching-select"
                         data-answer-field
-                        @change="flushDraftSave"
+                        :disabled="submitting"
+                        @change="handleImmediateAnswerChange"
                         @blur="flushDraftSave"
                         @mouseleave="flushDraftSave"
                       >
@@ -190,6 +226,7 @@
                         :aria-label="`第 ${question.number} 题答案`"
                         autocomplete="off"
                         spellcheck="false"
+                        :disabled="submitting"
                         @input="scheduleDraftSave"
                         @blur="flushDraftSave"
                         @mouseleave="flushDraftSave"
@@ -209,6 +246,7 @@
                             :aria-label="answerLabel(question, segment.slot_key)"
                             autocomplete="off"
                             spellcheck="false"
+                            :disabled="submitting"
                             @input="scheduleDraftSave"
                             @blur="flushDraftSave"
                             @mouseleave="flushDraftSave"
@@ -222,6 +260,27 @@
                         >({{ question.content.cue }})</span>
                       </div>
                     </template>
+
+                    <div
+                      v-if="!question.is_example && resultFor(question.id)"
+                      class="question-result"
+                      :class="`result-${resultFor(question.id).outcome}`"
+                      role="status"
+                    >
+                      <strong>{{ outcomeLabel(resultFor(question.id).outcome) }}</strong>
+                      <div
+                        v-if="resultFor(question.id).outcome !== 'correct' && resultFor(question.id).accepted_variants.length"
+                        class="accepted-answers"
+                      >
+                        <span>可接受答案：</span>
+                        <ul>
+                          <li
+                            v-for="(variant, variantIndex) in resultFor(question.id).accepted_variants"
+                            :key="variantIndex"
+                          >{{ formatAcceptedVariant(question, variant) }}</li>
+                        </ul>
+                      </div>
+                    </div>
                   </li>
                 </ol>
               </section>
@@ -258,6 +317,9 @@ const structuredUnit = ref(null)
 const structuredLoading = ref(false)
 const answers = ref({})
 const draftError = ref('')
+const submission = ref(null)
+const submitting = ref(false)
+const submitError = ref('')
 const loadError = ref('')
 const isTocOpen = ref(true)
 const showOriginalPage = ref(false)
@@ -294,6 +356,9 @@ const answeredCount = computed(() => answerableSlots.value.filter(slot => {
   const value = answers.value[slot.answer_key]
   return typeof value === 'string' && value.trim().length > 0
 }).length)
+const resultsByQuestion = computed(() => new Map(
+  (submission.value?.results || []).map(result => [result.question_id, result])
+))
 
 const pageUrl = pageNumber => `/api/grammar/book-pages/${pageNumber}`
 const rendererFor = exercise => EXERCISE_RENDERERS[exercise.type] || 'unsupported'
@@ -307,6 +372,23 @@ const answerLabel = (question, slotKey) => {
   return question.slots.length > 1
     ? `第 ${question.number} 题第 ${slotIndex + 1} 个答案`
     : `第 ${question.number} 题答案`
+}
+const resultFor = questionId => resultsByQuestion.value.get(questionId)
+const outcomeLabel = outcome => ({
+  correct: '正确',
+  incorrect: '错误',
+  incomplete: '未答完整',
+  unanswered: '未作答',
+  needs_review: '当前答案规则无法安全判定，需进一步审核'
+})[outcome] || '待审核'
+const formatAcceptedVariant = (question, variant) => question.slots
+  .map(slot => variant[slot.key])
+  .filter(value => typeof value === 'string')
+  .join(' / ')
+
+const invalidateSubmission = () => {
+  submission.value = null
+  submitError.value = ''
 }
 
 const draftKeyFor = unit => (
@@ -356,6 +438,14 @@ const buildDraftContext = (unit, values) => {
     localKey: draftKeyFor(unit),
     localValues: { ...values },
     answers: rows,
+    questionVersions: unit.exercises.flatMap(exercise => (
+      exercise.questions
+        .filter(question => !question.is_example)
+        .map(question => ({
+          question_id: question.id,
+          version: question.submission_version
+        }))
+    )),
     fingerprint: JSON.stringify(rows)
   }
 }
@@ -406,11 +496,17 @@ const queueDraftSave = context => {
 }
 
 const scheduleDraftSave = () => {
+  invalidateSubmission()
   const context = buildDraftContext(structuredUnit.value, { ...answers.value })
   if (!context) return
   writeLocalDraft(context.localKey, answers.value)
   window.clearTimeout(draftSaveTimer)
   draftSaveTimer = window.setTimeout(() => queueDraftSave(context), DRAFT_SAVE_DELAY)
+}
+
+const handleImmediateAnswerChange = () => {
+  invalidateSubmission()
+  flushDraftSave()
 }
 
 const flushDraftSave = () => {
@@ -425,6 +521,8 @@ const loadStructuredUnit = async number => {
   structuredLoading.value = true
   loadError.value = ''
   draftError.value = ''
+  submission.value = null
+  submitError.value = ''
   try {
     const { data } = await api.get(`/grammar/library/units/${number}`)
     if (request !== structuredRequest) return
@@ -466,12 +564,45 @@ const loadStructuredUnit = async number => {
   }
 }
 
+const submitAnswers = async () => {
+  const context = buildDraftContext(structuredUnit.value, { ...answers.value })
+  if (!context || submitting.value) return
+  submitting.value = true
+  submitError.value = ''
+  try {
+    await flushDraftSave()
+    const { data } = await api.post(
+      `/grammar/library/units/${context.unitNumber}/submissions`,
+      {
+        answers: context.answers,
+        question_versions: context.questionVersions
+      },
+      { timeout: 30000 }
+    )
+    const currentContext = buildDraftContext(structuredUnit.value, { ...answers.value })
+    if (
+      currentContext?.unitNumber !== context.unitNumber ||
+      currentContext?.fingerprint !== context.fingerprint
+    ) {
+      submitError.value = '答案在提交期间发生变化，请重新提交。'
+      return
+    }
+    submission.value = data.data
+  } catch (error) {
+    submitError.value = error.response?.data?.message || '提交判题失败，请稍后重试。'
+  } finally {
+    submitting.value = false
+  }
+}
+
 const selectUnit = number => {
+  if (submitting.value) return
   flushDraftSave()
   router.replace({ query: { unit: String(number) } })
 }
 
 const selectSection = section => {
+  if (submitting.value) return
   if (activeSection.value === 'exercise') flushDraftSave()
   const query = { unit: String(selectedUnit.value.number) }
   if (section === 'exercise') query.section = 'exercise'
@@ -566,6 +697,12 @@ onBeforeUnmount(() => {
 .lesson-media img { display: block; max-width: min(100%, 580px); height: auto; }
 .exercise-status > div { display: flex; align-items: center; gap: 14px; color: #3e756e; font-size: .75rem; }
 .draft-error { max-width: 520px; color: #a23f34; font-weight: 650; }
+.structured-toolbar .submit-answers { border-color: var(--book-blue); background: var(--book-blue); color: #fff; font-weight: 700; }
+.structured-toolbar .submit-answers:disabled { cursor: wait; opacity: .58; }
+.submission-error { margin: 16px clamp(24px, 5vw, 64px) 0; padding: 11px 14px; border-left: 4px solid #b34a3c; background: #fff3f0; color: #8c332a; }
+.submission-summary { display: flex; flex-wrap: wrap; gap: 8px 18px; align-items: baseline; margin: 20px clamp(24px, 5vw, 64px) 0; padding: 14px 16px; border: 1px solid #a8d8d1; background: #f2faf8; color: #315c57; }
+.submission-summary strong { color: var(--book-blue); font-size: 1.05rem; }
+.submission-summary small { margin-left: auto; color: var(--book-muted); }
 .exercise-workbook { font-size: 1.04rem; }
 .exercise-block { padding: 36px clamp(24px, 5vw, 64px) 42px; border-bottom: 1px solid #cad8dd; }
 .exercise-block:last-of-type { border-bottom: 0; }
@@ -583,6 +720,15 @@ onBeforeUnmount(() => {
 .question-list > li { padding: 5px 8px; font-size: 1.06rem; line-height: 1.62; }
 .question-list > li::marker { color: #4abfae; font-weight: 700; }
 .question-list > li:focus-within { box-shadow: inset 3px 0 0 rgba(88, 199, 183, .65); }
+.question-list > li.result-correct { background: #f2faf6; }
+.question-list > li.result-incorrect,.question-list > li.result-incomplete { background: #fff5f2; }
+.question-list > li.result-unanswered,.question-list > li.result-needs_review { background: #fff9e9; }
+.question-result { margin-top: 8px; padding: 8px 11px; border-left: 3px solid #d4a642; font-size: .88rem; line-height: 1.45; }
+.question-result.result-correct { border-left-color: #3d9b75; color: #257052; }
+.question-result.result-incorrect,.question-result.result-incomplete { border-left-color: #bd5748; color: #8d352c; }
+.question-result.result-unanswered,.question-result.result-needs_review { color: #79601f; }
+.accepted-answers { margin-top: 5px; color: #4b5559; }
+.accepted-answers ul { margin: 3px 0 0; padding-left: 20px; }
 .question-list > li.example { color: #536168; }
 .question-prompt { margin: 0; }
 .example-label { display: inline-block; margin-top: 4px; color: #347b72; font-size: .75rem; }

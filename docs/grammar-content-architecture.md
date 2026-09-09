@@ -16,6 +16,7 @@
 - `grammar_answer_key_entries`：原书完整 `Key to Exercises` 答案索引；以书籍、Unit、练习号和题号作为稳定键，可先于正文和题目导入。
 - `grammar_solutions` / `grammar_answer_variants`：标准答案及可接受变体，不随阅读接口发送给前端。
 - `grammar_drafts` / `grammar_draft_answers`：按用户空间和 Unit 保存的服务器端草稿，以及每个稳定答案槽的当前输入值。答案记录同时保存题目内容哈希，便于将来识别教材更新。
+- `grammar_attempt_sessions` / `grammar_attempt_answers`：一次正式提交及逐题不可修改的判题证据，保存用户答案、规范化结果、题目快照、完整可接受答案变体、判题版本和内容哈希。
 
 当前不需要单独的目录表。只有将来要支持 Part、Chapter 或自定义目录分组时，才增加 `grammar_sections`，由 Unit 关联分组。
 
@@ -48,6 +49,8 @@
 当前个人 Tailnet 部署使用配置项 `GRAMMAR_DRAFT_PROFILE`（默认 `default`）作为单一用户空间，因此 Mac 与 Windows 访问同一服务时共享草稿。未来增加登录后，将该值替换为认证用户 ID 即可扩展为多用户。
 
 草稿接口为 `GET/PUT /api/grammar/library/units/<unit>/draft`。`PUT` 接收该 Unit 当前所有答案槽的快照：非空值执行 upsert，空值或本次未提交的旧值被清除。服务器只允许保存已发布、active、非示例题的答案槽。
+
+正式提交接口为 `POST /api/grammar/library/units/<unit>/submissions`，结果读取接口为 `GET /api/grammar/library/submissions/<id>`。每次提交新建独立 session，不覆盖草稿或旧提交。判题只使用 `verified` solution，并按一条完整 `grammar_answer_variants` 同时匹配该题所有答案槽；不同 variant 的槽值不得交叉组合。详细规则见 `docs/grammar-deterministic-grading.md`。
 
 ## 当前完成度
 

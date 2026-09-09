@@ -13,6 +13,11 @@ from backend.services.grammar_draft_service import (
     get_unit_draft,
     save_unit_draft,
 )
+from backend.services.grammar_grading_service import (
+    SubmissionValidationError,
+    get_attempt_session,
+    submit_unit_attempt,
+)
 
 
 def get_book_page(page_number):
@@ -74,4 +79,29 @@ def put_library_unit_draft(unit_number):
         return jsonify({"status": "error", "message": "服务器保存失败，请稍后重试"}), 500
     if result is None:
         return jsonify({"status": "error", "message": "该 Unit 不存在或尚未发布"}), 404
+    return jsonify({"status": "success", "data": result})
+
+
+def post_library_unit_submission(unit_number):
+    if not request.is_json:
+        return jsonify({"status": "error", "message": "请求内容必须为 JSON"}), 400
+    try:
+        result = submit_unit_attempt(unit_number, request.get_json(silent=True))
+    except SubmissionValidationError as error:
+        return jsonify({"status": "error", "message": str(error)}), 400
+    except Exception:
+        db.session.rollback()
+        current_app.logger.exception(
+            "Failed to grade grammar submission for Unit %s", unit_number
+        )
+        return jsonify({"status": "error", "message": "提交判题失败，请稍后重试"}), 500
+    if result is None:
+        return jsonify({"status": "error", "message": "该 Unit 不存在或尚未发布"}), 404
+    return jsonify({"status": "success", "data": result}), 201
+
+
+def get_library_submission(session_id):
+    result = get_attempt_session(session_id)
+    if result is None:
+        return jsonify({"status": "error", "message": "未找到该次提交记录"}), 404
     return jsonify({"status": "success", "data": result})
