@@ -7,7 +7,7 @@ storage_dir="/srv/ai-project/storage"
 env_file="/etc/ai-project/ai-project.env"
 backup_dir="/var/backups/ai-project"
 
-if [[ ! -f "$env_file" ]]; then
+if ! sudo test -f "$env_file"; then
   echo "Missing $env_file; copy ai-project.env.example and set production secrets." >&2
   exit 1
 fi
