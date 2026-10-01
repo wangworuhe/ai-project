@@ -27,10 +27,13 @@ Existing frontend bundle-size warnings are informational; test, lint, build, or 
 - Persistent runtime data: `/srv/ai-project/storage`.
 - Secrets: `/etc/ai-project/ai-project.env`, owned by root and mode `0600`.
 - Backups: `/var/backups/ai-project`.
+- Mecha database backups: `/var/backups/ai-project/mecha`.
 - Compose file: `deployment/jp2/compose.yaml`.
 - App containers use Linux host networking but bind services only to loopback: Waitress `127.0.0.1:5000`, Caddy `127.0.0.1:8080`.
 - Mecha is a separate host service on `127.0.0.1:21212`; never expose Mecha with Tailscale Funnel.
-- Mecha runs as the existing `ubuntu` user from `/usr/local/bin/mecha`, with source/runtime files in `/opt/mecha/current`, state in `/home/ubuntu/.mecha`, and systemd unit `deployment/jp2/mecha.service`.
+- Mecha runs as the existing `ubuntu` user from `/usr/local/bin/mecha`, with source/runtime files in `/opt/mecha/current`, state in `/home/ubuntu/.mecha`, and a user systemd unit sourced from `deployment/jp2/mecha.service`.
+- Mecha uses `ubuntu`'s rootless Docker daemon at `/run/user/1001/docker.sock`; keep the system Docker daemon separate for ai-project Compose.
+- Build Mecha from revision `8ceced7f` with `deployment/jp2/mecha-rootless.patch`; validate with `scripts/smoke-mecha-worker.py` before releasing the AI runner.
 - The default Tailscale Serve/Funnel design needs no new OCI or host-firewall ingress rule. If a future design requires public-interface binding, document the exact protocol, port, and allowed source before opening it.
 
 Read `docs/jp2-deployment.md` before changing production deployment, data paths, Tailscale exposure, Mecha, or release scripts.

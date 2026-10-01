@@ -1,14 +1,12 @@
 [Unit]
 Description=Mecha task runtime for ai-project
-Wants=network-online.target
-After=network-online.target docker.service
+After=docker.service
 Requires=docker.service
 
 [Service]
 Type=simple
-User=ubuntu
-Group=ubuntu
 Environment=HOME=/home/ubuntu
+Environment=DOCKER_HOST=unix://%t/docker.sock
 WorkingDirectory=/opt/mecha/current
 ExecStart=/usr/local/bin/mecha serve
 Restart=on-failure
@@ -24,4 +22,4 @@ MemoryMax=512M
 TasksMax=128
 
 [Install]
-WantedBy=multi-user.target
+WantedBy=default.target

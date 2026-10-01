@@ -1,3 +1,5 @@
+import os
+
 import azure.cognitiveservices.speech as speechsdk
 
 from backend.services.audio_output_service import create_timestamped_mp3_path

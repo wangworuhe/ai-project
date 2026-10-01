@@ -1,0 +1,119 @@
+diff --git a/internal/cli/docker_cmds.go b/internal/cli/docker_cmds.go
+index b0b89c1..a046da6 100644
+--- a/internal/cli/docker_cmds.go
++++ b/internal/cli/docker_cmds.go
+@@ -11,7 +11,7 @@ import (
+ )
+ 
+ const (
+-	dockerTimeout        = 30 * time.Second
++	dockerTimeout           = 30 * time.Second
+ 	persistentHealthTimeout = 120 * time.Second // CLIs pre-installed (~5s), but allow headroom for custom images
+ )
+ 
+@@ -36,16 +36,17 @@ func dockerStart(reg *workers.Registry, name string) error {
+ 		return err
+ 	}
+ 
+-	userStr, err := workers.CurrentUser()
+-	if err != nil {
+-		return fmt.Errorf("resolve user for container: %w", err)
+-	}
+-
+ 	dock, err := workers.NewDockerClient(dc.Host)
+ 	if err != nil {
+ 		return err
+ 	}
+ 	defer dock.Close()
++	userCtx, cancelUser := context.WithTimeout(context.Background(), dockerTimeout)
++	userStr, err := dock.ContainerUser(userCtx)
++	cancelUser()
++	if err != nil {
++		return fmt.Errorf("resolve user for container: %w", err)
++	}
+ 
+ 	labels := map[string]string{"mecha.worker": name}
+ 	for k, v := range dc.Labels {
+@@ -195,4 +196,3 @@ func waitForHealth(dock *workers.DockerClient, id string, timeout time.Duration)
+ 		}
+ 	}
+ }
+-
+diff --git a/internal/serve/disposable.go b/internal/serve/disposable.go
+index 301f2ec..6d911ec 100644
+--- a/internal/serve/disposable.go
++++ b/internal/serve/disposable.go
+@@ -49,7 +49,7 @@ func (s *Server) disposableContainer(ctx context.Context, entry workers.Entry) (
+ 		dock.Close()
+ 		return "", cleanup, fmt.Errorf("build mounts: %w", err)
+ 	}
+-	userStr, err := workers.CurrentUser()
++	userStr, err := dock.ContainerUser(ctx)
+ 	if err != nil {
+ 		dock.Close()
+ 		return "", cleanup, fmt.Errorf("resolve user: %w", err)
+diff --git a/internal/workers/container_user.go b/internal/workers/container_user.go
+new file mode 100644
+index 0000000..efdca0a
+--- /dev/null
++++ b/internal/workers/container_user.go
+@@ -0,0 +1,31 @@
++package workers
++
++import (
++	"context"
++	"fmt"
++
++	"github.com/moby/moby/client"
++)
++
++// ContainerUser matches the daemon's UID mapping when mounting host credentials.
++// UID 0 in a rootless daemon maps to the daemon owner, not host root.
++func (d *DockerClient) ContainerUser(ctx context.Context) (string, error) {
++	hostUser, err := CurrentUser()
++	if err != nil {
++		return "", err
++	}
++	info, err := d.cli.Info(ctx, client.InfoOptions{})
++	if err != nil {
++		return "", fmt.Errorf("inspect docker security options: %w", err)
++	}
++	return containerUserForSecurityOptions(hostUser, info.Info.SecurityOptions), nil
++}
++
++func containerUserForSecurityOptions(hostUser string, options []string) string {
++	for _, option := range options {
++		if option == "name=rootless" {
++			return "0:0"
++		}
++	}
++	return hostUser
++}
+diff --git a/internal/workers/container_user_test.go b/internal/workers/container_user_test.go
+new file mode 100644
+index 0000000..c90a214
+--- /dev/null
++++ b/internal/workers/container_user_test.go
+@@ -0,0 +1,22 @@
++package workers
++
++import "testing"
++
++func TestContainerUserForSecurityOptions(t *testing.T) {
++	tests := []struct {
++		name    string
++		options []string
++		want    string
++	}{
++		{"rootful", []string{"name=seccomp,profile=builtin", "name=cgroupns"}, "1001:1001"},
++		{"rootless", []string{"name=seccomp,profile=builtin", "name=rootless", "name=cgroupns"}, "0:0"},
++		{"similar-name", []string{"name=rootless-other"}, "1001:1001"},
++	}
++	for _, tt := range tests {
++		t.Run(tt.name, func(t *testing.T) {
++			if got := containerUserForSecurityOptions("1001:1001", tt.options); got != tt.want {
++				t.Errorf("container user = %q, want %q", got, tt.want)
++			}
++		})
++	}
++}

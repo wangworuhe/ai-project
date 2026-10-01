@@ -20,6 +20,8 @@ sudo install -d -m 0750 -o ubuntu -g ubuntu "$storage_dir"
 sudo install -d -m 0700 -o root -g root "$backup_dir"
 sudo python3 "$repo_root/deployment/jp2/backup_sqlite.py" \
   "$storage_dir/database/database.db" "$backup_dir"
+sudo python3 "$repo_root/deployment/jp2/backup_sqlite.py" \
+  "/home/ubuntu/.mecha/mecha.db" "$backup_dir/mecha"
 
 sudo docker compose -f "$compose_file" build --pull
 sudo docker compose -f "$compose_file" up -d --remove-orphans
@@ -37,4 +39,3 @@ sudo docker compose -f "$compose_file" ps
 sudo docker compose -f "$compose_file" logs --tail=100
 echo "Deployment failed health verification." >&2
 exit 1
-
