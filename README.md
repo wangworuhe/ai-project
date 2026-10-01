@@ -115,3 +115,12 @@ tailscale serve --bg --https=8443 8080
 ```bash
 ./scripts/update-and-restart.sh
 ```
+
+## jp2 生产部署
+
+jp2 使用宿主机原生 Tailscale 和 Docker Compose 运行应用。部署目录、数据迁移、备份、发布与回滚流程见：
+
+- `docs/jp2-deployment.md`
+- `deployment/jp2/compose.yaml`
+- `deployment/jp2/deploy.sh`
+- `deployment/jp2/tailscale-expose.sh`

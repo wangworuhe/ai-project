@@ -1,0 +1,17 @@
+.git
+.gitignore
+.venv
+.env
+.env.*
+__pycache__
+*.pyc
+*.pyo
+*.log
+.DS_Store
+storage
+frontend/node_modules
+frontend/dist
+frontend/.cache
+coverage
+htmlcov
+
