@@ -20,6 +20,7 @@ Existing frontend bundle-size warnings are informational; test, lint, build, or 
 
 ## Production deployment: jp2
 
+- The Mac is a development checkout only. Its ai-project backend, Caddy, and grammar AI review LaunchAgents are disabled; do not re-enable them as part of a jp2 release.
 - Target SSH alias: `jp2`.
 - Tailscale device: `yala-jp` (`yala-jp.tailaafe48.ts.net`). Tailscale runs natively on the host, not in Docker.
 - Tailscale SSH is enabled for private administration; the existing public-key SSH path remains the deployment fallback.

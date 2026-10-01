@@ -69,6 +69,12 @@ After final cutover, reset both Serve and Funnel on the Mac while leaving the Ma
 - The Mac's previous Tailscale Serve on HTTPS 8443 and Funnel on HTTPS 443 were reset. `tailscale serve status --json` returned `{}` while the Mac stayed online in the Tailnet. jp2 Funnel remains off, so the migrated app is accessible only to Tailnet members.
 - The deployed ai-project commit is `2770afc`. It was transferred by verified Git bundles from the local checkout; these new commits have not yet been pushed to the Git remote. No Oracle external firewall rule was added.
 
+## Mac development checkout (2026-10-02)
+
+The Mac retains the repository, virtual environment, `.env`, and `storage/` for development and rollback. Production requests and automatic explanation jobs run on jp2. The three Mac LaunchAgents `com.yala.ai-project.backend`, `com.yala.ai-project.caddy`, and `com.yala.ai-project.grammar-ai-review` were stopped and persistently disabled with `launchctl`; their plist files remain under `~/Library/LaunchAgents` for reversible local testing. Do not re-enable them during a jp2 release. The local port 8080 no longer responds; jp2's Tailnet health endpoint remains healthy.
+
+The Mac remains logged into Tailscale but has no Serve or Funnel configuration. Local `im.mecha.serve` and `im.mecha.mcp` are owned by the separate `mecha.im` project and were left untouched; stopping the ai-project runner prevents the Mac from submitting new grammar explanation jobs.
+
 ## Routine release
 
 1. Review, test, commit, and push changes from the development machine.
