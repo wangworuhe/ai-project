@@ -30,6 +30,7 @@ Existing frontend bundle-size warnings are informational; test, lint, build, or 
 - Compose file: `deployment/jp2/compose.yaml`.
 - App containers use Linux host networking but bind services only to loopback: Waitress `127.0.0.1:5000`, Caddy `127.0.0.1:8080`.
 - Mecha is a separate host service on `127.0.0.1:21212`; never expose Mecha with Tailscale Funnel.
+- Mecha runs as the existing `ubuntu` user from `/usr/local/bin/mecha`, with source/runtime files in `/opt/mecha/current`, state in `/home/ubuntu/.mecha`, and systemd unit `deployment/jp2/mecha.service`.
 - The default Tailscale Serve/Funnel design needs no new OCI or host-firewall ingress rule. If a future design requires public-interface binding, document the exact protocol, port, and allowed source before opening it.
 
 Read `docs/jp2-deployment.md` before changing production deployment, data paths, Tailscale exposure, Mecha, or release scripts.
@@ -43,3 +44,4 @@ Read `docs/jp2-deployment.md` before changing production deployment, data paths,
 5. Deploy privately with Tailscale Serve first. Funnel is allowed only after application authentication and abuse controls are in place.
 6. Do not advertise jp2 as an exit node or subnet router without an explicit networking requirement and route scope.
 7. Project deployment details belong in this repository, not in the user-level `vps` skill. The `vps` skill only records host/Tailscale infrastructure changes.
+8. Do not start `ai-review-runner` until Mecha is healthy, `grammar-mistake-explainer` is online, and a real schema-valid task has passed.

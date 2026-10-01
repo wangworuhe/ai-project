@@ -13,6 +13,8 @@ This document is the source of truth for deploying ai-project to jp2. Host-wide 
 - Persistent data: `/srv/ai-project/storage`.
 - Deploy backups: `/var/backups/ai-project`.
 - Loopback endpoints: Caddy `127.0.0.1:8080`, Waitress `127.0.0.1:5000`, Mecha `127.0.0.1:21212`.
+- Mecha binary: `/usr/local/bin/mecha`; source/runtime tree: `/opt/mecha/current`; state and configuration: `/home/ubuntu/.mecha`.
+- Mecha service: `/etc/systemd/system/mecha.service`, sourced from `deployment/jp2/mecha.service`, running as the existing `ubuntu` user.
 
 The backend and review runner share the same SQLite-backed storage bind mount. Docker host networking is intentional on Linux: it lets the runner reach host-local Mecha while every HTTP listener remains bound to loopback.
 
@@ -32,6 +34,12 @@ The default deployment requires no new Oracle Cloud Infrastructure security-list
 5. Run `deployment/jp2/deploy.sh` and verify API health, grammar content, formal submissions, mistake book, TTS, and one AI explanation job.
 
 Do not delete or overwrite the Mac copy during the initial migration. Keep it as the rollback source until jp2 has passed functional validation and a fresh backup exists.
+
+## Mecha runtime
+
+Mecha is a separate host service, not an ai-project Compose service. Build or install the Linux ARM64 binary from the Mecha revision that implements the deployed `POST /task` contract, then build `mecha-worker:latest` from the same revision. Register `workers/grammar-mistake-explainer.yml`, install `deployment/jp2/mecha.service`, and keep the API on `127.0.0.1:21212` with an API key in `/home/ubuntu/.mecha/config.yml`.
+
+The Worker requires `/home/ubuntu/.codex/auth.json` with owner `ubuntu` and mode `0600`. Treat it as a high-sensitivity credential: transfer it only with explicit authorization, never put it in Git or a shared temporary directory, and validate its use with a synthetic task before processing stored mistakes. Start and enable `mecha.service` only after the credential is present. `ai-review-runner` must remain stopped until Mecha health, Worker online state, schema validation, idempotency, and restart recovery are confirmed.
 
 ## Tailscale exposure policy
 
