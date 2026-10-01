@@ -62,6 +62,13 @@ Never expose Mecha port 21212. Exit-node advertisement, subnet routes, and Tails
 
 After final cutover, reset both Serve and Funnel on the Mac while leaving the Mac logged into Tailscale.
 
+## Cutover record (2026-10-01)
+
+- jp2 is running ai-project, the AI review runner, Mecha, and its rootless Docker Worker. A synthetic explanation completed with schema, answer-slot, deterministic-grading boundary, and deduplication checks; the Worker remained usable after a Mecha restart. The runner is configured and idle with no queued jobs at the time of validation.
+- Azure Speech generated a short MP3 through the jp2 API; its media URL returned HTTP 200 through jp2's Tailnet-only Serve. The app health endpoint also returned HTTP 200 through `https://yala-jp.tailaafe48.ts.net:8443/` when the Mac bypassed its general-purpose HTTP proxy for the Tailnet domain.
+- The Mac's previous Tailscale Serve on HTTPS 8443 and Funnel on HTTPS 443 were reset. `tailscale serve status --json` returned `{}` while the Mac stayed online in the Tailnet. jp2 Funnel remains off, so the migrated app is accessible only to Tailnet members.
+- The deployed ai-project commit is `2770afc`. It was transferred by verified Git bundles from the local checkout; these new commits have not yet been pushed to the Git remote. No Oracle external firewall rule was added.
+
 ## Routine release
 
 1. Review, test, commit, and push changes from the development machine.
