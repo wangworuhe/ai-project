@@ -8,6 +8,8 @@ from flask import current_app
 
 from backend.extensions import db
 from backend.models.grammar import (
+    GrammarAIReviewItem,
+    GrammarAIReviewJob,
     GrammarAttemptAnswer,
     GrammarAttemptSession,
     GrammarExercise,
@@ -127,6 +129,43 @@ def _serialize_entry(entry):
     question = entry.question
     exercise = question.exercise
     unit = exercise.unit
+    review_item = (
+        GrammarAIReviewItem.query
+        .filter_by(attempt_answer_id=latest_wrong.id)
+        .join(GrammarAIReviewJob)
+        .filter(GrammarAIReviewJob.status == "completed")
+        .order_by(GrammarAIReviewItem.id.desc())
+        .first()
+    )
+    review_job = next((job for job in
+        GrammarAIReviewJob.query.filter_by(attempt_session_id=latest_wrong.session_id)
+        .order_by(GrammarAIReviewJob.id.desc()).all()
+        if latest_wrong.id in {
+            item.get("attempt_answer_id")
+            for item in (job.payload_json or {}).get("items", [])
+            if isinstance(item, dict)
+        }
+    ), None)
+    ai_review = None
+    if review_item:
+        ai_review = {
+            "status": "completed",
+            "explanation_status": review_item.explanation_status,
+            "error_type": review_item.error_type,
+            "summary": review_item.summary_zh,
+            "explanation": review_item.explanation_zh,
+            "corrected_answers": review_item.corrected_answers_json,
+            "grammar_rule": review_item.grammar_rule,
+            "contrast_examples": review_item.contrast_examples_json,
+            "review_tip": review_item.review_tip_zh,
+            "confidence": float(review_item.confidence),
+            "review_decision": review_item.review_decision,
+        }
+    elif review_job:
+        ai_review = {
+            "status": review_job.status,
+            "message": "讲解服务暂时不可用" if review_job.status in {"failed", "invalid_result"} else None,
+        }
     return {
         "id": entry.id,
         "status": entry.status,
@@ -152,6 +191,7 @@ def _serialize_entry(entry):
             "accepted_variants": _accepted_variants(latest_wrong),
             "submitted_at": latest_wrong.session.submitted_at.isoformat(),
         },
+        "ai_review": ai_review,
     }
 
 

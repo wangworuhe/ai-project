@@ -5,10 +5,12 @@ from backend.controllers.grammar_controller import (
     get_library_media,
     get_library_mistakes,
     get_library_submission,
+    get_library_submission_ai_review,
     get_library_unit,
     get_library_unit_draft,
     get_library_units,
     post_library_unit_submission,
+    post_library_submission_ai_review_retry,
     put_library_unit_draft,
 )
 
@@ -23,5 +25,11 @@ grammar_bp.post("/library/units/<int:unit_number>/submissions")(
     post_library_unit_submission
 )
 grammar_bp.get("/library/submissions/<int:session_id>")(get_library_submission)
+grammar_bp.get("/library/submissions/<int:session_id>/ai-review")(
+    get_library_submission_ai_review
+)
+grammar_bp.post("/library/submissions/<int:session_id>/ai-review/retry")(
+    post_library_submission_ai_review_retry
+)
 grammar_bp.get("/library/mistakes")(get_library_mistakes)
 grammar_bp.get("/library/media/<int:media_id>")(get_library_media)

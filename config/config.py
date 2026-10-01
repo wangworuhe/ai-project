@@ -47,4 +47,12 @@ class Config:
     SQLALCHEMY_DATABASE_URI = f"sqlite:///{DATABASE_PATH}"
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     GRAMMAR_DRAFT_PROFILE = os.environ.get("GRAMMAR_DRAFT_PROFILE", "default")
+    MECHA_BASE_URL = os.environ.get("MECHA_BASE_URL", "").rstrip("/")
+    MECHA_API_KEY = os.environ.get("MECHA_API_KEY", "")
+    GRAMMAR_AI_REVIEW_WORKER = os.environ.get(
+        "GRAMMAR_AI_REVIEW_WORKER", "grammar-mistake-explainer"
+    )
+    GRAMMAR_AI_REVIEW_BATCH_SIZE = int(os.environ.get("GRAMMAR_AI_REVIEW_BATCH_SIZE", "20"))
+    GRAMMAR_AI_REVIEW_HTTP_TIMEOUT = float(os.environ.get("GRAMMAR_AI_REVIEW_HTTP_TIMEOUT", "15"))
+    GRAMMAR_AI_REVIEW_RESULT_MAX_BYTES = int(os.environ.get("GRAMMAR_AI_REVIEW_RESULT_MAX_BYTES", "1048576"))
     LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO")  # 通过环境变量覆盖

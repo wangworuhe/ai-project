@@ -8,6 +8,8 @@ from backend.models.grammar import (
     GrammarAnswerSlot,
     GrammarAnswerKeyEntry,
     GrammarAnswerVariant,
+    GrammarAIReviewItem,
+    GrammarAIReviewJob,
     GrammarAttempt,
     GrammarAttemptAnswer,
     GrammarAttemptSession,
@@ -58,6 +60,13 @@ def init_db(app):
                     "ADD COLUMN is_active BOOLEAN NOT NULL DEFAULT 1"
                 ))
 
+        if "prompt_version" not in columns("grammar_ai_review_jobs"):
+            db.session.execute(text(
+                "ALTER TABLE grammar_ai_review_jobs "
+                "ADD COLUMN prompt_version VARCHAR(64) NOT NULL "
+                "DEFAULT 'grammar-mistake-explainer/v1'"
+            ))
+
         db.session.execute(text(
             "CREATE UNIQUE INDEX IF NOT EXISTS "
             "ix_grammar_solutions_answer_key_entry_id "
@@ -81,3 +90,5 @@ def init_db(app):
         # idempotent because each entry remembers the latest applied attempt answer.
         from backend.services.grammar_mistake_service import sync_existing_attempts
         sync_existing_attempts()
+        from backend.services.grammar_ai_review_service import sync_existing_review_jobs
+        sync_existing_review_jobs()

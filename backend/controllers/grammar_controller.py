@@ -19,6 +19,10 @@ from backend.services.grammar_grading_service import (
     submit_unit_attempt,
 )
 from backend.services.grammar_mistake_service import MistakeQueryError, list_mistakes
+from backend.services.grammar_ai_review_service import (
+    get_session_review,
+    retry_session_review,
+)
 
 
 def get_book_page(page_number):
@@ -106,6 +110,25 @@ def get_library_submission(session_id):
     if result is None:
         return jsonify({"status": "error", "message": "未找到该次提交记录"}), 404
     return jsonify({"status": "success", "data": result})
+
+
+def get_library_submission_ai_review(session_id):
+    result = get_session_review(session_id)
+    if result is None:
+        return jsonify({"status": "error", "message": "未找到该次提交记录"}), 404
+    return jsonify({"status": "success", "data": result})
+
+
+def post_library_submission_ai_review_retry(session_id):
+    try:
+        result = retry_session_review(session_id)
+    except Exception:
+        db.session.rollback()
+        current_app.logger.exception("Failed to retry grammar AI review for submission %s", session_id)
+        return jsonify({"status": "error", "message": "重新排队失败，请稍后重试"}), 500
+    if result is None:
+        return jsonify({"status": "error", "message": "未找到该次提交记录"}), 404
+    return jsonify({"status": "success", "data": result}), 201
 
 
 def get_library_mistakes():

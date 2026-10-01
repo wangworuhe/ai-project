@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "request_id", "attempt_session_id", "language", "lesson_context", "items"],
+  "properties": {
+    "schema_version": {"type": "string", "const": "grammar-explanation-input/v1"},
+    "request_id": {"type": "string", "minLength": 1, "maxLength": 100},
+    "attempt_session_id": {"type": "integer", "minimum": 1},
+    "language": {"type": "string", "const": "zh-CN"},
+    "lesson_context": {"type": "object"},
+    "items": {"type": "array", "minItems": 1, "maxItems": 20, "items": {"type": "object", "required": ["attempt_answer_id", "question_id", "exercise_number", "question_number", "question_type", "question_content", "user_answers", "accepted_variants", "deterministic_outcome", "question_content_sha256"], "properties": {"attempt_answer_id": {"type": "integer"}, "question_id": {"type": "integer"}, "exercise_number": {"type": "string"}, "question_number": {"type": "string"}, "question_type": {"type": "string"}, "question_content": {"type": "object"}, "user_answers": {"type": "object", "additionalProperties": {"type": "string"}}, "accepted_variants": {"type": "array", "items": {"type": "object", "additionalProperties": {"type": "string"}}}, "deterministic_outcome": {"type": "string", "enum": ["incorrect", "needs_review"]}, "question_content_sha256": {"type": "string"}, "solution_sha256": {"type": ["string", "null"]}}, "additionalProperties": false}}
+  }
+}

@@ -21,6 +21,7 @@ from backend.models.grammar import (
     GrammarUnit,
 )
 from backend.services.grammar_mistake_service import apply_attempt_answer
+from backend.services.grammar_ai_review_service import create_review_jobs_for_session
 
 
 GRADING_VERSION = "deterministic-v1"
@@ -426,6 +427,7 @@ def submit_unit_attempt(unit_number, payload):
     session.needs_review_count = counts["needs_review"]
     session.points_awarded = total_awarded
     session.points_possible = total_possible
+    create_review_jobs_for_session(session)
     db.session.commit()
 
     return _serialize_session(session, results=results)

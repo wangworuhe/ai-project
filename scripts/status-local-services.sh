@@ -2,7 +2,7 @@
 set -euo pipefail
 
 uid="$(id -u)"
-for label in com.yala.ai-project.backend com.yala.ai-project.caddy; do
+for label in com.yala.ai-project.backend com.yala.ai-project.grammar-ai-review com.yala.ai-project.caddy; do
   print -- "--- $label ---"
   launchctl print "gui/$uid/$label" | rg 'state =|pid =|last exit code' || true
 done

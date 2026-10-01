@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "request_id", "items", "warnings"],
+  "properties": {
+    "schema_version": {"type": "string", "const": "grammar-explanation-output/v1"},
+    "request_id": {"type": "string", "minLength": 1, "maxLength": 100},
+    "items": {
+      "type": "array", "maxItems": 20,
+      "items": {
+        "type": "object", "additionalProperties": false,
+        "required": ["attempt_answer_id", "explanation_status", "error_type", "summary_zh", "explanation_zh", "corrected_answers", "grammar_rule", "contrast_examples", "review_tip_zh", "confidence", "review_decision"],
+        "properties": {
+          "attempt_answer_id": {"type": "integer", "minimum": 1},
+          "explanation_status": {"type": "string", "enum": ["explained", "review_suggested", "insufficient_context"]},
+          "error_type": {"type": "string", "enum": ["tense", "verb_form", "subject_verb_agreement", "article", "preposition", "word_order", "pronoun", "spelling", "punctuation", "reasonable_variant", "insufficient_context", "other"]},
+          "summary_zh": {"type": "string", "minLength": 1, "maxLength": 500},
+          "explanation_zh": {"type": "string", "minLength": 1, "maxLength": 4000},
+          "corrected_answers": {"type": "array", "maxItems": 20, "items": {"type": "object", "additionalProperties": false, "required": ["slot_key", "value"], "properties": {"slot_key": {"type": "string", "minLength": 1, "maxLength": 64}, "value": {"type": "string", "minLength": 1, "maxLength": 2000}}}},
+          "grammar_rule": {"type": "string", "maxLength": 2000},
+          "contrast_examples": {"type": "array", "maxItems": 5, "items": {"type": "object", "additionalProperties": false, "required": ["wrong", "correct"], "properties": {"wrong": {"type": "string", "maxLength": 500}, "correct": {"type": "string", "maxLength": 500}}}},
+          "review_tip_zh": {"type": "string", "minLength": 1, "maxLength": 1000},
+          "confidence": {"type": "number", "minimum": 0, "maximum": 1},
+          "review_decision": {"type": "string", "enum": ["not_applicable", "reasonable_variant", "likely_incorrect", "insufficient_context"]}
+        }
+      }
+    },
+    "warnings": {"type": "array", "maxItems": 20, "items": {"type": "string", "maxLength": 500}}
+  }
+}

@@ -38,6 +38,28 @@
             </dd>
           </div>
         </dl>
+        <section v-if="item.ai_review" class="ai-review" :class="`ai-${item.ai_review.status}`">
+          <strong>AI 错因讲解</strong>
+          <template v-if="item.ai_review.status === 'completed'">
+            <p>{{ item.ai_review.summary }}</p>
+            <p>{{ item.ai_review.explanation }}</p>
+            <p v-if="item.ai_review.grammar_rule"><b>语法规则：</b>{{ item.ai_review.grammar_rule }}</p>
+            <ul v-if="item.ai_review.contrast_examples?.length" class="ai-examples">
+              <li v-for="(example, index) in item.ai_review.contrast_examples" :key="index">
+                <span>✕ {{ example.wrong }}</span><span>✓ {{ example.correct }}</span>
+              </li>
+            </ul>
+            <p v-if="item.ai_review.review_tip"><b>复习建议：</b>{{ item.ai_review.review_tip }}</p>
+          </template>
+          <p v-else-if="item.ai_review.status === 'queued'">讲解已排队，正式判题结果不受影响。</p>
+          <p v-else-if="item.ai_review.status === 'dispatched'">正在生成讲解…</p>
+          <template v-else>
+            <p>讲解生成失败。{{ item.ai_review.message || '' }}</p>
+            <button type="button" :disabled="retrying === item.latest_wrong.submission_id" @click="retryReview(item)">
+              {{ retrying === item.latest_wrong.submission_id ? '正在重新排队…' : '重新生成讲解' }}
+            </button>
+          </template>
+        </section>
         <footer>
           <span>累计答错 {{ item.wrong_count }} 次</span>
           <span v-if="item.correct_streak">连续答对 {{ item.correct_streak }} / {{ item.mastery_target }} 次</span>
@@ -49,7 +71,7 @@
 </template>
 
 <script setup>
-import { onMounted, ref, watch } from 'vue'
+import { onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import api from '@/api'
 
 const props = defineProps({ refreshKey: { type: Number, default: 0 } })
@@ -59,7 +81,15 @@ const scope = ref('active')
 const book = ref(null)
 const loading = ref(false)
 const error = ref('')
+const retrying = ref(null)
 let requestNumber = 0
+let pollTimer = null
+
+const schedulePoll = () => {
+  clearTimeout(pollTimer)
+  const pending = book.value?.items.some(item => ['queued', 'dispatched'].includes(item.ai_review?.status))
+  if (pending) pollTimer = setTimeout(load, 5000)
+}
 
 const load = async () => {
   const request = ++requestNumber
@@ -75,7 +105,10 @@ const load = async () => {
       error.value = loadError.response?.data?.message || '无法读取错题本。'
     }
   } finally {
-    if (request === requestNumber) loading.value = false
+    if (request === requestNumber) {
+      loading.value = false
+      schedulePoll()
+    }
   }
 }
 
@@ -83,6 +116,18 @@ const setScope = value => {
   if (scope.value === value) return
   scope.value = value
   load()
+}
+
+const retryReview = async item => {
+  retrying.value = item.latest_wrong.submission_id
+  try {
+    await api.post(`/grammar/library/submissions/${item.latest_wrong.submission_id}/ai-review/retry`, {}, { timeout: 10000 })
+    await load()
+  } catch (retryError) {
+    error.value = retryError.response?.data?.message || '讲解重新排队失败。'
+  } finally {
+    retrying.value = null
+  }
 }
 
 const answerText = values => Object.values(values || {})
@@ -103,6 +148,7 @@ const statusLabel = item => ({
 
 watch(() => props.refreshKey, load)
 onMounted(load)
+onBeforeUnmount(() => clearTimeout(pollTimer))
 </script>
 
 <style scoped>
@@ -127,6 +173,16 @@ onMounted(load)
 .mistake-card dl > div { display: grid; grid-template-columns: 112px minmax(0, 1fr); gap: 10px; }
 .mistake-card dt { color: #68757b; font-size: .8rem; }
 .mistake-card dd { margin: 0; color: #244b9a; line-height: 1.45; }
+.ai-review { margin-top: 16px; padding: 13px 15px; border-left: 3px solid #4a7f78; background: #f3f9f8; color: #304846; }
+.ai-review > strong { color: #287268; }
+.ai-review p { margin: 7px 0 0; line-height: 1.55; }
+.ai-review button { margin-top: 10px; padding: 6px 10px; border: 1px solid #bd5748; background: #fff; color: #923f34; cursor: pointer; }
+.ai-review button:disabled { cursor: wait; opacity: .65; }
+.ai-examples { display: grid; gap: 5px; margin: 10px 0 0; padding: 0; list-style: none; }
+.ai-examples li { display: flex; flex-wrap: wrap; gap: 6px 18px; }
+.ai-examples span:first-child { color: #923f34; }
+.ai-examples span:last-child { color: #257052; }
+.ai-invalid_result,.ai-failed { border-color: #bd5748; background: #fff6f4; }
 .mistake-card footer { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 16px; margin-top: 16px; padding-top: 12px; border-top: 1px solid #e6ebed; color: #68757b; font-size: .78rem; }
 .mistake-card footer button { margin-left: auto; }
 @media (max-width: 680px) { .mistake-header { align-items: flex-start; flex-direction: column; }.mistake-card dl > div { grid-template-columns: 1fr; gap: 3px; }.mistake-card footer button { width: 100%; margin-left: 0; } }

@@ -19,6 +19,11 @@ mkdir -p storage/caddy
 sed -e "s|__PROJECT_ROOT__|$project_root|g" deployment/Caddyfile.template > storage/caddy/Caddyfile
 
 launchctl kickstart -k "gui/$uid/com.yala.ai-project.backend"
+if launchctl print "gui/$uid/com.yala.ai-project.grammar-ai-review" >/dev/null 2>&1; then
+  launchctl kickstart -k "gui/$uid/com.yala.ai-project.grammar-ai-review"
+else
+  print "AI review service is not installed; run scripts/install-local-services.sh after configuring Mecha."
+fi
 launchctl kickstart -k "gui/$uid/com.yala.ai-project.caddy"
 
 for _ in {1..10}; do

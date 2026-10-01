@@ -515,6 +515,74 @@ class GrammarAttemptAnswer(db.Model):
     solution = db.relationship("GrammarSolution")
 
 
+class GrammarAIReviewJob(db.Model):
+    """Durable, idempotent batch sent to the external explanation worker."""
+
+    __tablename__ = "grammar_ai_review_jobs"
+    __table_args__ = (
+        db.UniqueConstraint("dedup_key", name="uq_grammar_ai_review_job_dedup"),
+        db.UniqueConstraint("mecha_task_id", name="uq_grammar_ai_review_job_task"),
+    )
+
+    id = db.Column(db.Integer, primary_key=True)
+    profile_key = db.Column(db.String(64), nullable=False, index=True)
+    attempt_session_id = db.Column(
+        db.Integer, db.ForeignKey("grammar_attempt_sessions.id", ondelete="RESTRICT"),
+        nullable=False, index=True,
+    )
+    batch_index = db.Column(db.Integer, nullable=False)
+    batch_count = db.Column(db.Integer, nullable=False)
+    worker_name = db.Column(db.String(120), nullable=False)
+    schema_version = db.Column(db.String(64), nullable=False)
+    prompt_version = db.Column(db.String(64), nullable=False)
+    request_id = db.Column(db.String(100), nullable=False, unique=True)
+    dedup_key = db.Column(db.String(160), nullable=False)
+    payload_json = db.Column(db.JSON, nullable=False)
+    payload_sha256 = db.Column(db.String(64), nullable=False)
+    mecha_task_id = db.Column(db.String(160), nullable=True)
+    status = db.Column(db.String(32), nullable=False, default="queued", index=True)
+    dispatch_attempts = db.Column(db.Integer, nullable=False, default=0)
+    poll_attempts = db.Column(db.Integer, nullable=False, default=0)
+    error_message = db.Column(db.Text, nullable=True)
+    raw_result_text = db.Column(db.Text, nullable=True)
+    next_attempt_at = db.Column(db.DateTime, nullable=True, index=True)
+    dispatched_at = db.Column(db.DateTime, nullable=True)
+    completed_at = db.Column(db.DateTime, nullable=True)
+    created_at = db.Column(db.DateTime, nullable=False, default=db.func.current_timestamp())
+    updated_at = db.Column(db.DateTime, nullable=False, default=db.func.current_timestamp(), onupdate=db.func.current_timestamp())
+
+    session = db.relationship("GrammarAttemptSession")
+    items = db.relationship("GrammarAIReviewItem", back_populates="job", cascade="all, delete-orphan")
+
+
+class GrammarAIReviewItem(db.Model):
+    """Validated AI explanation attached to immutable grading evidence."""
+
+    __tablename__ = "grammar_ai_review_items"
+    __table_args__ = (
+        db.UniqueConstraint("job_id", "attempt_answer_id", name="uq_grammar_ai_review_item_answer"),
+    )
+
+    id = db.Column(db.Integer, primary_key=True)
+    job_id = db.Column(db.Integer, db.ForeignKey("grammar_ai_review_jobs.id", ondelete="CASCADE"), nullable=False, index=True)
+    attempt_answer_id = db.Column(db.Integer, db.ForeignKey("grammar_attempt_answers.id", ondelete="RESTRICT"), nullable=False, index=True)
+    explanation_status = db.Column(db.String(32), nullable=False)
+    error_type = db.Column(db.String(40), nullable=False)
+    summary_zh = db.Column(db.Text, nullable=False)
+    explanation_zh = db.Column(db.Text, nullable=False)
+    corrected_answers_json = db.Column(db.JSON, nullable=False)
+    grammar_rule = db.Column(db.Text, nullable=False)
+    contrast_examples_json = db.Column(db.JSON, nullable=False)
+    review_tip_zh = db.Column(db.Text, nullable=False)
+    confidence = db.Column(db.Numeric(4, 3), nullable=False)
+    review_decision = db.Column(db.String(32), nullable=False)
+    result_sha256 = db.Column(db.String(64), nullable=False)
+    created_at = db.Column(db.DateTime, nullable=False, default=db.func.current_timestamp())
+
+    job = db.relationship("GrammarAIReviewJob", back_populates="items")
+    attempt_answer = db.relationship("GrammarAttemptAnswer")
+
+
 class GrammarMistakeEntry(db.Model):
     """Current mistake-book state derived from immutable attempt answers."""
 
