@@ -82,23 +82,40 @@ The Mac remains logged into Tailscale but has no Serve or Funnel configuration. 
 ### Personal public domain: ai.yalacore.com
 
 The public domain A record targets jpv3 (`161.33.165.41`). The optional
-`deployment/jp2/public.compose.yaml` gateway serves HTTPS with HTTP Basic
-authentication for one owner; it does not add user accounts or isolate the
-existing shared practice data. Its credentials are in
-`/etc/ai-project/public.env` (root-owned, `0600`), with `PUBLIC_USERNAME` and a
-bcrypt `PUBLIC_PASSWORD_HASH`. Quote the hash in that env file so Compose does
-not interpolate dollar signs. Never commit this file or its plaintext password.
+`deployment/jp2/public.compose.yaml` gateway serves HTTPS. Authentication now
+uses the application's `/login` page, replacing the browser Basic Auth dialog.
+One personal account shares the existing practice data; registration and
+password recovery are not enabled.
 
-The gateway forwards authenticated requests to `127.0.0.1:8080`, strips the
-Authorization header, rejects foreign browser origins, and limits bodies to
-16 MB. Enable `AI_PROJECT_PUBLIC_ACCESS=yes` in the existing application env
-file before release. The backend then enforces origin checks, 600 API requests
-per minute, speech/AI budgets of 10 requests per minute and 120 per hour, at
-most two concurrent speech/AI requests, and a 10000-character text bound.
-These are per-process budgets for the single Waitress process, reset by a
-restart; they are not a billing cap. `AI_PROJECT_ALLOWED_ORIGINS` lists the
-public origin and existing Tailscale HTTPS origin. Deterministic grading is
-unchanged.
+Set `AI_PROJECT_AUTH_ENABLED=yes`, `AI_PROJECT_AUTH_USERNAME`, and
+`AI_PROJECT_AUTH_PASSWORD_HASH` (Werkzeug format) in
+`/etc/ai-project/ai-project.env` (root-owned, mode `0600`). Never commit real
+credentials. Public mode defaults authentication on and fails startup if
+credentials are missing. Explicitly disabling auth is only for local development;
+the public deploy script requires it enabled. Existing private password files
+remain the owner's credential reference; `/etc/ai-project/public.env` holds
+legacy Basic credentials for rollback only.
+
+Successful login creates an opaque session cookie with Secure, HttpOnly,
+SameSite=Lax and a fixed lifetime of **60 days**. Only its SHA-256 digest and a
+CSRF token are stored in persistent `storage/database/auth.db` (mode `0600`).
+Sessions survive application restarts. Logout revokes the current session;
+changing the configured password hash invalidates all old sessions. Every API,
+media file and book-page route requires authentication except health and auth
+bootstrap/login. Health exposes only `status: ok` for container checks. The SPA
+shell and static bundles are public; protected data is fetched only after login.
+Mutating authenticated requests require a session CSRF token; login requires
+JSON and a custom header. Auth responses and API data use `Cache-Control:
+no-store`. Ten login attempts per 15 minutes are allowed across the personal
+account (process-local, reset by restart).
+
+The gateway rejects foreign browser origins and limits bodies to 16 MB.
+Enable `AI_PROJECT_PUBLIC_ACCESS=yes` in the application environment. The backend
+also enforces origin checks, 600 API requests per minute, speech/AI budgets of
+10 requests per minute and 120 per hour, at most two concurrent speech/AI
+requests, and a 10000-character text bound. These per-process budgets reset on
+restart and are not a billing cap. `AI_PROJECT_ALLOWED_ORIGINS` lists both public
+and Tailscale HTTPS origins. Deterministic grading is unchanged.
 
 Network scope: the gateway binds `0.0.0.0:443`, **TCP HTTPS only**, with allowed
 source `0.0.0.0/0` for browser access and ACME TLS-ALPN validation. Host INPUT
@@ -111,9 +128,12 @@ must visit `https://ai.yalacore.com`. Certificates persist under
 Before release, verify the gateway configuration and authenticated/unauthenticated
 HTTP behavior over a loopback-only staging listener. Run required repository
 checks, commit and push master, then use `deployment/jp2/deploy.sh --public`.
-The deploy script backs up both SQLite databases before replacing containers.
+The deploy script backs up the application, Mecha and existing auth SQLite
+databases before replacing containers. It verifies private health and a protected
+session endpoint before recreating the public gateway without Basic Auth.
 After the precise firewall ingress is in place, verify a valid public TLS
-certificate, anonymous HTTP 401, authenticated frontend/API HTTP 200, rejected
+certificate, anonymous login-page HTTP 200 and protected API HTTP 401,
+authenticated API HTTP 200, rejected
 cross-site requests, and HTTP 429 without invoking real paid services. A
 successful private health check alone is not public acceptance.
 

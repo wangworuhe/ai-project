@@ -1,7 +1,7 @@
 <template>
   <div id="app">
     <!-- 顶部导航 -->
-    <nav class="nav-bar">
+    <nav v-if="route.path !== '/login'" class="nav-bar">
       <RouterLink
         v-for="item in navs"
         :key="item.path"
@@ -11,6 +11,7 @@
       >
         {{ item.label }}
       </RouterLink>
+      <button v-if="auth.enabled" class="logout" @click="signOut">退出登录</button>
     </nav>
 
     <!-- 页面容器 -->
@@ -24,6 +25,18 @@
 </template>
 
 <script setup>
+import { useRoute, useRouter } from 'vue-router'
+import { auth, logout } from './auth'
+const route = useRoute()
+const router = useRouter()
+async function signOut() {
+  try {
+    await logout()
+    await router.replace('/login')
+  } catch (error) {
+    window.alert('退出失败，请检查网络后重试。')
+  }
+}
 // import { routes } from "@/router"; // 复用同一个 routes 数组
 
 const navs = [
@@ -49,7 +62,9 @@ export default {
 
 
 <style scoped>
+.logout { background: none; border: 0; color: #526b7a; cursor: pointer; font: inherit; }
 .nav-bar {
+  flex-wrap: wrap;
   display: flex;
   justify-content: center; /* 居中导航项 */
   gap: 24px;

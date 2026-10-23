@@ -23,16 +23,13 @@ ai.yalacore.com {
 	respond @crossOrigin 403
 	@crossSite header Sec-Fetch-Site cross-site
 	respond @crossSite 403
-	basic_auth {
-		{$PUBLIC_USERNAME} {$PUBLIC_PASSWORD_HASH}
-	}
 	header {
 		X-Content-Type-Options nosniff
 		Referrer-Policy same-origin
 		X-Frame-Options DENY
 	}
 	reverse_proxy 127.0.0.1:8080 {
-		# Browsers authenticate only at this edge; never forward the password.
+		# Application sessions authenticate requests; discard legacy Basic credentials.
 		header_up -Authorization
 	}
 }

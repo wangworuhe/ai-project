@@ -11,6 +11,7 @@ from backend.routes.translation import translation_bp
 from backend.routes.cambridge import cambridge_bp
 from backend.routes.grammar import grammar_bp
 from backend.public_guard import install_public_guard
+from backend.auth import install_auth
 
 from flask_cors import CORS
 
@@ -23,6 +24,7 @@ def create_app():
     app.config.from_object('config.config.Config')
 
     CORS(app, origins=app.config["PUBLIC_ALLOWED_ORIGINS"] if app.config["PUBLIC_ACCESS_ENABLED"] else "*")
+    install_auth(app)
     install_public_guard(app)
 
     init_db(app)

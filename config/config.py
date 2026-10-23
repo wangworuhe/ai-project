@@ -31,6 +31,11 @@ for directory in (
     directory.mkdir(parents=True, exist_ok=True)
 
 class Config:
+    AUTH_ENABLED = os.environ.get("AI_PROJECT_AUTH_ENABLED", os.environ.get("AI_PROJECT_PUBLIC_ACCESS", "")) == "yes"
+    AUTH_USERNAME = os.environ.get("AI_PROJECT_AUTH_USERNAME", "")
+    AUTH_PASSWORD_HASH = os.environ.get("AI_PROJECT_AUTH_PASSWORD_HASH", "")
+    AUTH_DATABASE_PATH = str(DATABASE_DIR / "auth.db")
+    AUTH_COOKIE_SECURE = True
     PUBLIC_ACCESS_ENABLED = os.environ.get("AI_PROJECT_PUBLIC_ACCESS", "") == "yes"
     PUBLIC_ALLOWED_ORIGINS = [
         value.strip() for value in os.environ.get(
