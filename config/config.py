@@ -31,6 +31,14 @@ for directory in (
     directory.mkdir(parents=True, exist_ok=True)
 
 class Config:
+    PUBLIC_ACCESS_ENABLED = os.environ.get("AI_PROJECT_PUBLIC_ACCESS", "") == "yes"
+    PUBLIC_ALLOWED_ORIGINS = [
+        value.strip() for value in os.environ.get(
+            "AI_PROJECT_ALLOWED_ORIGINS",
+            "https://ai.yalacore.com,https://yala-jp.tailaafe48.ts.net:8443",
+        ).split(",") if value.strip()
+    ]
+    MAX_CONTENT_LENGTH = 16 * 1024 * 1024 if PUBLIC_ACCESS_ENABLED else None
     PROJECT_ROOT = str(PROJECT_ROOT)
     STORAGE_DIR = str(STORAGE_DIR)
     DATABASE_PATH = str(DATABASE_PATH)

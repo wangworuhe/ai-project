@@ -1,0 +1,23 @@
+name: ai-project-public
+
+services:
+  gateway:
+    image: caddy:2.10.2-alpine
+    network_mode: host
+    restart: unless-stopped
+    env_file:
+      - /etc/ai-project/public.env
+    volumes:
+      - ./public.Caddyfile:/etc/caddy/Caddyfile:ro
+      - /srv/ai-project/caddy-public/data:/data
+      - /srv/ai-project/caddy-public/config:/config
+    read_only: true
+    tmpfs:
+      - /tmp:size=16m,mode=1777
+    security_opt:
+      - no-new-privileges:true
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: "3"

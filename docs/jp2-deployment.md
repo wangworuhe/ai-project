@@ -1,12 +1,14 @@
-# jp2 production deployment
+# jpv3 production deployment
 
-This document is the source of truth for deploying ai-project to jp2. Host-wide VPS facts remain in the external `vps` skill; application releases, paths, data, and rollback procedures stay here.
+This document is the source of truth for deploying ai-project to jpv3. Host-wide VPS facts remain in the external `vps` skill; application releases, paths, data, and rollback procedures stay here.
+
+The host's current shorthand and SSH alias are `jpv3` (formerly `jp2`); connect with `ssh jpv3`. The existing `deployment/jp2/` directory and `docs/jp2-deployment.md` filename are intentionally retained.
 
 ## Architecture and paths
 
-- Host: SSH alias `jp2`, Ubuntu ARM64.
+- Host: SSH alias `jpv3`, Ubuntu ARM64.
 - Tailscale: native host service, node `yala-jp`, MagicDNS `yala-jp.tailaafe48.ts.net`.
-- Tailscale SSH: enabled for Tailnet administration; public-key SSH through alias `jp2` remains available as a fallback.
+- Tailscale SSH: enabled for Tailnet administration; public-key SSH through alias `jpv3` remains available as a fallback.
 - Checkout: `/opt/ai-project/current`.
 - Compose: `/opt/ai-project/current/deployment/jp2/compose.yaml`.
 - Secrets: `/etc/ai-project/ai-project.env` (`root:root`, mode `0600`).
@@ -35,7 +37,7 @@ The default deployment requires no new Oracle Cloud Infrastructure security-list
 4. Install/configure host-local Mecha and the `grammar-mistake-explainer` worker before enabling the review runner.
 5. Run `deployment/jp2/deploy.sh` and verify API health, grammar content, formal submissions, mistake book, TTS, and one AI explanation job.
 
-Do not delete or overwrite the Mac copy during the initial migration. Keep it as the rollback source until jp2 has passed functional validation and a fresh backup exists.
+Do not delete or overwrite the Mac copy during the initial migration. Keep it as the rollback source until jpv3 has passed functional validation and a fresh backup exists.
 
 ## Mecha runtime
 
@@ -64,21 +66,67 @@ After final cutover, reset both Serve and Funnel on the Mac while leaving the Ma
 
 ## Cutover record (2026-10-01)
 
-- jp2 is running ai-project, the AI review runner, Mecha, and its rootless Docker Worker. A synthetic explanation completed with schema, answer-slot, deterministic-grading boundary, and deduplication checks; the Worker remained usable after a Mecha restart. The runner is configured and idle with no queued jobs at the time of validation.
-- Azure Speech generated a short MP3 through the jp2 API; its media URL returned HTTP 200 through jp2's Tailnet-only Serve. The app health endpoint also returned HTTP 200 through `https://yala-jp.tailaafe48.ts.net:8443/` when the Mac bypassed its general-purpose HTTP proxy for the Tailnet domain.
-- The Mac's previous Tailscale Serve on HTTPS 8443 and Funnel on HTTPS 443 were reset. `tailscale serve status --json` returned `{}` while the Mac stayed online in the Tailnet. jp2 Funnel remains off, so the migrated app is accessible only to Tailnet members.
+- jpv3 is running ai-project, the AI review runner, Mecha, and its rootless Docker Worker. A synthetic explanation completed with schema, answer-slot, deterministic-grading boundary, and deduplication checks; the Worker remained usable after a Mecha restart. The runner is configured and idle with no queued jobs at the time of validation.
+- Azure Speech generated a short MP3 through the jpv3 API; its media URL returned HTTP 200 through jpv3's Tailnet-only Serve. The app health endpoint also returned HTTP 200 through `https://yala-jp.tailaafe48.ts.net:8443/` when the Mac bypassed its general-purpose HTTP proxy for the Tailnet domain.
+- The Mac's previous Tailscale Serve on HTTPS 8443 and Funnel on HTTPS 443 were reset. `tailscale serve status --json` returned `{}` while the Mac stayed online in the Tailnet. jpv3 Funnel remains off, so the migrated app is accessible only to Tailnet members.
 - The deployed ai-project commit is `2770afc`. It was transferred by verified Git bundles from the local checkout; these new commits have not yet been pushed to the Git remote. No Oracle external firewall rule was added.
 
 ## Mac development checkout (2026-10-02)
 
-The Mac retains the repository, virtual environment, `.env`, and `storage/` for development and rollback. Production requests and automatic explanation jobs run on jp2. The three Mac LaunchAgents `com.yala.ai-project.backend`, `com.yala.ai-project.caddy`, and `com.yala.ai-project.grammar-ai-review` were stopped and persistently disabled with `launchctl`; their plist files remain under `~/Library/LaunchAgents` for reversible local testing. Do not re-enable them during a jp2 release. The local port 8080 no longer responds; jp2's Tailnet health endpoint remains healthy.
+The Mac retains the repository, virtual environment, `.env`, and `storage/` for development and rollback. Production requests and automatic explanation jobs run on jpv3. The three Mac LaunchAgents `com.yala.ai-project.backend`, `com.yala.ai-project.caddy`, and `com.yala.ai-project.grammar-ai-review` were stopped and persistently disabled with `launchctl`; their plist files remain under `~/Library/LaunchAgents` for reversible local testing. Do not re-enable them during a jpv3 release. The local port 8080 no longer responds; jpv3's Tailnet health endpoint remains healthy.
 
 The Mac remains logged into Tailscale but has no Serve or Funnel configuration. Local `im.mecha.serve` and `im.mecha.mcp` are owned by the separate `mecha.im` project and were left untouched; stopping the ai-project runner prevents the Mac from submitting new grammar explanation jobs.
 
 ## Routine release
 
+### Personal public domain: ai.yalacore.com
+
+The public domain A record targets jpv3 (`161.33.165.41`). The optional
+`deployment/jp2/public.compose.yaml` gateway serves HTTPS with HTTP Basic
+authentication for one owner; it does not add user accounts or isolate the
+existing shared practice data. Its credentials are in
+`/etc/ai-project/public.env` (root-owned, `0600`), with `PUBLIC_USERNAME` and a
+bcrypt `PUBLIC_PASSWORD_HASH`. Quote the hash in that env file so Compose does
+not interpolate dollar signs. Never commit this file or its plaintext password.
+
+The gateway forwards authenticated requests to `127.0.0.1:8080`, strips the
+Authorization header, rejects foreign browser origins, and limits bodies to
+16 MB. Enable `AI_PROJECT_PUBLIC_ACCESS=yes` in the existing application env
+file before release. The backend then enforces origin checks, 600 API requests
+per minute, speech/AI budgets of 10 requests per minute and 120 per hour, at
+most two concurrent speech/AI requests, and a 10000-character text bound.
+These are per-process budgets for the single Waitress process, reset by a
+restart; they are not a billing cap. `AI_PROJECT_ALLOWED_ORIGINS` lists the
+public origin and existing Tailscale HTTPS origin. Deterministic grading is
+unchanged.
+
+Network scope: the gateway binds `0.0.0.0:443`, **TCP HTTPS only**, with allowed
+source `0.0.0.0/0` for browser access and ACME TLS-ALPN validation. Host INPUT
+and OCI security-list/NSG ingress must permit that exact traffic. No new public
+TCP 80, UDP 443, application backend, database, or Mecha listener is needed.
+HTTP certificate validation and automatic HTTP redirects are disabled; users
+must visit `https://ai.yalacore.com`. Certificates persist under
+`/srv/ai-project/caddy-public/`. Existing Tailscale Serve HTTPS 8443 remains.
+
+Before release, verify the gateway configuration and authenticated/unauthenticated
+HTTP behavior over a loopback-only staging listener. Run required repository
+checks, commit and push master, then use `deployment/jp2/deploy.sh --public`.
+The deploy script backs up both SQLite databases before replacing containers.
+After the precise firewall ingress is in place, verify a valid public TLS
+certificate, anonymous HTTP 401, authenticated frontend/API HTTP 200, rejected
+cross-site requests, and HTTP 429 without invoking real paid services. A
+successful private health check alone is not public acceptance.
+
+To roll back the public entry only, run
+`sudo docker compose -f deployment/jp2/public.compose.yaml down` and remove the
+specific TCP 443 ingress rule. Retain certificate storage, application runtime
+storage, secrets, and Tailscale Serve. Application rollback follows the steps
+below; preserve a fresh database backup before any data restore.
+
+### Application release
+
 1. Review, test, commit, and push changes from the development machine.
-2. On jp2, fetch and fast-forward `/opt/ai-project/current` to the intended commit.
+2. On jpv3, fetch and fast-forward `/opt/ai-project/current` to the intended commit.
 3. Run `deployment/jp2/deploy.sh`. It creates a consistent SQLite backup, retains the latest 14 deploy backups, rebuilds images, replaces containers, and verifies health.
 4. Verify `sudo docker compose -f deployment/jp2/compose.yaml ps`, `/api/health`, and the changed feature.
 5. Check AI review separately when the change touches Mecha, prompts, schemas, or grading.

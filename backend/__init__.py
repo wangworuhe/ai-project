@@ -10,6 +10,7 @@ from backend.routes.assessment import assessment_bp
 from backend.routes.translation import translation_bp
 from backend.routes.cambridge import cambridge_bp
 from backend.routes.grammar import grammar_bp
+from backend.public_guard import install_public_guard
 
 from flask_cors import CORS
 
@@ -21,7 +22,8 @@ def create_app():
     app = Flask(__name__)
     app.config.from_object('config.config.Config')
 
-    CORS(app)  # 允许所有来源访问
+    CORS(app, origins=app.config["PUBLIC_ALLOWED_ORIGINS"] if app.config["PUBLIC_ACCESS_ENABLED"] else "*")
+    install_public_guard(app)
 
     init_db(app)
     migrate.init_app(app, db)

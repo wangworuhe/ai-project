@@ -18,10 +18,10 @@ git diff --check
 
 Existing frontend bundle-size warnings are informational; test, lint, build, or schema failures are blocking.
 
-## Production deployment: jp2
+## Production deployment: jpv3
 
-- The Mac is a development checkout only. Its ai-project backend, Caddy, and grammar AI review LaunchAgents are disabled; do not re-enable them as part of a jp2 release.
-- Target SSH alias: `jp2`.
+- The Mac is a development checkout only. Its ai-project backend, Caddy, and grammar AI review LaunchAgents are disabled; do not re-enable them as part of a jpv3 release.
+- Target SSH alias: `jpv3`.
 - Tailscale device: `yala-jp` (`yala-jp.tailaafe48.ts.net`). Tailscale runs natively on the host, not in Docker.
 - Tailscale SSH is enabled for private administration; the existing public-key SSH path remains the deployment fallback.
 - Application checkout: `/opt/ai-project/current`.
@@ -46,6 +46,6 @@ Read `docs/jp2-deployment.md` before changing production deployment, data paths,
 3. Never overwrite `/srv/ai-project/storage` with an empty checkout or image directory.
 4. Build and start with `deployment/jp2/deploy.sh`; verify `/api/health` and core grammar APIs.
 5. Deploy privately with Tailscale Serve first. Funnel is allowed only after application authentication and abuse controls are in place.
-6. Do not advertise jp2 as an exit node or subnet router without an explicit networking requirement and route scope.
+6. Do not advertise jpv3 as an exit node or subnet router without an explicit networking requirement and route scope.
 7. Project deployment details belong in this repository, not in the user-level `vps` skill. The `vps` skill only records host/Tailscale infrastructure changes.
 8. Do not start `ai-review-runner` until Mecha is healthy, `grammar-mistake-explainer` is online, and a real schema-valid task has passed.
