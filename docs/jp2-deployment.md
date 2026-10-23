@@ -139,3 +139,16 @@ below; preserve a fresh database backup before any data restore.
 4. Verify health before changing Tailscale exposure.
 
 Database rollback can discard newer submissions. Preserve the current database under a new timestamped filename before restoring an older copy.
+
+## Public cutover acceptance (2026-10-22)
+
+- Application release: `a32fcadab01b3d8f12a68dc39040be2ebce8ed39`, committed and pushed before deployment. The deployment used `deployment/jp2/deploy.sh --public`.
+- Public URL: `https://ai.yalacore.com`; public DNS A record `161.33.165.41`, no AAAA record at acceptance. A personal username/password is required for both the frontend and APIs.
+- Certificate: Let's Encrypt YE1, subject `ai.yalacore.com`, valid through `2027-01-21 02:15:18 UTC`. Normal certificate verification succeeded from the Mac's public proxy egress and independently from rn, without using Tailscale.
+- Acceptance: anonymous/incorrect credentials HTTP 401, authenticated frontend/health/grammar library HTTP 200, foreign-origin requests HTTP 403, excessive speech text HTTP 413, and speech/AI request budget HTTP 429. Rate-limit probes used a nonexistent route in the protected speech namespace; no real paid request was submitted by the acceptance checks.
+- Validation: 22 local backend tests passed, frontend lint/build passed with informational bundle-size warnings, and `git diff --check` passed. The six request-guard tests were also rerun successfully inside the deployed backend image.
+- Initial certificate validation failed before the host's TCP 443 rule was enabled. After the port was enabled, certificate issuance and public HTTPS acceptance succeeded. No certificate-validation bypass was used.
+- Host firewall: one new IPv4 TCP 443 rule, source `0.0.0.0/0`, comment `ai-project-public-https`; persisted by adding only that rule before INPUT REJECT in `/etc/iptables/rules.v4`. Existing live Docker/Tailscale chains were not flushed or reloaded. OCI rules did not need to be changed during this release; public ingress was verified end to end.
+- Backups: application SQLite `/var/backups/ai-project/database-20261023-030813.db`; Mecha SQLite `/var/backups/ai-project/mecha/database-20261023-030813.db`; prior application environment `/etc/ai-project/ai-project.env.bak.public-20261023T030809Z`; persistent firewall `/var/backups/ai-project/rules.v4.before-public-20261023`; live firewall snapshot `/var/backups/ai-project/iptables-runtime.before-public-20261023`. Backup filename timestamps are UTC.
+- Existing Tailscale HTTPS 8443 still returned HTTP 200 with valid TLS from jpv3. The original Mecha Worker remained healthy. Backend 5000, private web 8080, and Mecha 21212 retained loopback listeners. No Mac production LaunchAgent was enabled.
+- The loopback-only staging gateway was stopped after acceptance. The Mac's earlier Tailscale DNS interface-binding issue was not changed by this public-domain deployment.
